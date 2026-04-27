@@ -10,8 +10,12 @@
     <div class="app-shell">
       <header class="app-header">
         <section class="totals-panel" aria-labelledby="totalsTitle">
-          <h2 id="totalsTitle">Total Elapsed Time <span id="todayTotalTime">0h 00m 00s</span></h2>
+          <h2 class="visually-hidden" id="totalsTitle">Time totals</h2>
           <form class="time-goal-form" id="timeGoalForm">
+            <div class="time-meter">
+              <span>Total Elapsed Time</span>
+              <strong id="todayTotalTime">0h 00m 00s</strong>
+            </div>
             <label class="time-goal-field">
               <span>Goal Hours</span>
               <input id="timeGoalHoursInput" min="0" step="1" type="number" placeholder="0">
@@ -22,7 +26,7 @@
             </label>
             <button class="button button-small button-secondary" type="submit">Set</button>
             <button class="button button-small" id="clearTimeGoalButton" type="button">Clear</button>
-            <div class="time-goal-remaining">
+            <div class="time-meter">
               <span>Remaining</span>
               <strong id="timeGoalRemaining">No goal set</strong>
             </div>
