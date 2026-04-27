@@ -76,6 +76,8 @@ function cacheElements() {
   elements.reportDialog = document.getElementById("reportDialog");
   elements.reportForm = document.getElementById("reportForm");
   elements.reportPreview = document.getElementById("reportPreview");
+  elements.reportEmailInput = document.getElementById("reportEmailInput");
+  elements.emailReportButton = document.getElementById("emailReportButton");
   elements.deleteAfterReportInput = document.getElementById("deleteAfterReportInput");
 }
 
@@ -89,6 +91,7 @@ function bindEvents() {
   elements.rowForm.addEventListener("submit", saveRowFromDialog);
   elements.logForm.addEventListener("submit", saveManualLogFromDialog);
   elements.reportForm.addEventListener("submit", downloadReportFromDialog);
+  elements.emailReportButton.addEventListener("click", emailReportFromDialog);
 
   document.addEventListener("click", handleDocumentClick);
   document.addEventListener("change", handleDocumentChange);
@@ -1240,6 +1243,7 @@ function makeRoomAtLeft(row, taskIdToSkip = "") {
 
 function openReportDialog() {
   renderReportPreview();
+  elements.reportEmailInput.value = "";
   elements.deleteAfterReportInput.checked = true;
   openDialog(elements.reportDialog);
 }
@@ -1315,6 +1319,20 @@ function downloadReportFromDialog(event) {
   if (elements.deleteAfterReportInput.checked) {
     deleteTimeLogs();
   }
+}
+
+function emailReportFromDialog() {
+  if (elements.reportEmailInput.value && !elements.reportEmailInput.checkValidity()) {
+    elements.reportEmailInput.reportValidity();
+    return;
+  }
+
+  const recipient = elements.reportEmailInput.value.trim();
+  const subject = `Timekeeper Report - ${formatFileDate(new Date())}`;
+  const body = buildReportText();
+  const mailtoUrl = `mailto:${encodeURIComponent(recipient)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+  window.location.href = mailtoUrl;
 }
 
 function buildReport() {

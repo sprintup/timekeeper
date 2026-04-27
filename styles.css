@@ -108,6 +108,7 @@ button {
 
 .top-control-panel {
   display: flex;
+  flex-wrap: wrap;
   gap: 18px;
   align-items: flex-start;
   margin-top: 18px;
@@ -120,20 +121,21 @@ button {
 
 .actions-panel {
   display: flex;
-  flex: 0 0 auto;
+  flex: 0 0 max-content;
   flex-wrap: nowrap;
   border: 2px solid var(--line-strong);
   border-radius: 8px;
   padding: 12px;
   background: #ffffff;
   align-items: center;
-  overflow-x: auto;
+  overflow-x: visible;
   max-width: 100%;
 }
 
 .actions-panel .button {
   flex: 0 0 auto;
   min-width: max-content;
+  white-space: nowrap;
 }
 
 .github-page-link {
@@ -148,8 +150,8 @@ button {
 }
 
 .instructions-panel {
-  flex: 1 1 auto;
-  min-width: 180px;
+  flex: 1 1 280px;
+  min-width: 0;
   border: 2px solid var(--line-strong);
   border-radius: 8px;
   background: #ffffff;
@@ -843,7 +845,21 @@ body.is-board-dragging * {
 
   .actions-panel {
     display: flex;
-    flex-wrap: nowrap;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    overflow-x: visible;
+    width: 100%;
+  }
+
+  .instructions-panel {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .actions-panel .button {
+    flex: 1 1 190px;
+    min-width: 0;
+    white-space: normal;
   }
 
   .task-row {

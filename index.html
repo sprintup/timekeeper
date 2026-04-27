@@ -62,7 +62,7 @@
           </div>
         </details>
         <div class="header-actions actions-panel" aria-label="Report actions">
-          <button class="button button-primary" id="generateReportButton" type="button">Generate today's report</button>
+          <button class="button button-primary" id="generateReportButton" type="button">Generate report</button>
           <button class="button button-secondary" id="clearCompletedButton" type="button">Clear completed tasks</button>
           <button class="button button-danger" id="resetStateButton" type="button">Reset</button>
           <a class="icon-button github-page-link" id="githubPageLink" href="https://github.com/sprintup/timekeeper" target="_blank" rel="noreferrer" aria-label="Open GitHub repository" title="GitHub repository">
@@ -232,13 +232,18 @@
           <button class="icon-button" value="cancel" type="button" data-action="close-report-dialog" aria-label="Close">Close</button>
         </div>
         <div class="report-preview" id="reportPreview"></div>
+        <label class="field">
+          <span>Email report to</span>
+          <input id="reportEmailInput" type="email" placeholder="name@example.com">
+        </label>
         <label class="checkline">
           <input id="deleteAfterReportInput" type="checkbox">
           <span>Delete time logs after download</span>
         </label>
         <div class="modal-actions">
           <button class="button button-secondary" type="button" data-action="close-report-dialog">Cancel</button>
-          <button class="button button-primary" type="submit">Download</button>
+          <button class="button button-secondary" id="emailReportButton" type="button">Email</button>
+          <button class="button button-primary" type="submit" formnovalidate>Download</button>
         </div>
       </form>
     </dialog>
