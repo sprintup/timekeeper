@@ -22,12 +22,37 @@
         </div>
       </header>
 
+      <section class="totals-panel" aria-labelledby="totalsTitle">
+        <div>
+          <p class="eyebrow">Today&apos;s Time</p>
+          <h2 id="totalsTitle">Total <span id="todayTotalTime">0h 00m 00s</span></h2>
+        </div>
+        <dl class="totals-grid" id="todayTotals">
+          <div>
+            <dt>Admin</dt>
+            <dd id="adminTotalTime">0h 00m 00s</dd>
+          </div>
+          <div>
+            <dt>Operations</dt>
+            <dd id="operationsTotalTime">0h 00m 00s</dd>
+          </div>
+          <div>
+            <dt>Projects</dt>
+            <dd id="projectsTotalTime">0h 00m 00s</dd>
+          </div>
+        </dl>
+      </section>
+
       <details class="instructions-panel">
         <summary>Instructions</summary>
         <div class="instructions-content">
-          <p>Create task boxes for work you want to accomplish today. Use the bucket dropdown to classify each task as Admin, Operations, or Projects.</p>
-          <p>Press Start to begin timing a task. Starting another task pauses the current timer, promotes that task to the highest-importance row if needed, and moves it to the highest-urgency position on the left.</p>
-          <p>Add side quests from the right side of any row. Drag task boxes horizontally or vertically, and drag row handles to reorder importance. Use reports to download today&apos;s bucket totals and objective details.</p>
+          <ol>
+            <li>Add a task box for work you want to accomplish today, then choose its bucket: Admin, Operations, or Projects.</li>
+            <li>Press Start to begin timing. Starting another task pauses the current timer automatically.</li>
+            <li>Starting a lower-priority task moves it to the highest-importance row and the highest-urgency position on the left.</li>
+            <li>Use Add Side Quest for interruptions, and use the drag handles to rearrange tasks or rows.</li>
+            <li>Open Show Time Log to add, edit, or delete entries. Generate a report when you want today&apos;s totals and timeline.</li>
+          </ol>
         </div>
       </details>
 
@@ -73,9 +98,9 @@
     </div>
 
     <template id="taskCardTemplate">
-      <article class="task-card" draggable="true">
+      <article class="task-card">
         <div class="task-card-header">
-          <span class="drag-handle task-drag-handle" aria-label="Drag task" role="img">::::</span>
+          <span class="drag-handle task-drag-handle" aria-label="Drag task" role="img" title="Drag task">::::</span>
           <select class="bucket-select" aria-label="Bucket">
             <option>Admin</option>
             <option>Operations</option>
@@ -98,11 +123,7 @@
             <dd class="finished-time"></dd>
           </div>
         </dl>
-        <details class="time-log">
-          <summary>Show time log</summary>
-          <div class="log-list"></div>
-          <button class="button button-small" data-action="add-log" type="button">Add time</button>
-        </details>
+        <button class="button button-small time-log-button" data-action="show-log" type="button">Show time log</button>
         <div class="task-actions">
           <button class="button button-small button-start" data-action="toggle-timer" type="button">Start</button>
           <button class="button button-small" data-action="finish-task" type="button">Finish</button>
@@ -140,16 +161,42 @@
       </form>
     </dialog>
 
+    <dialog class="modal modal-wide" id="timeLogDialog">
+      <div class="modal-body">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Task Log</p>
+            <h2 id="timeLogDialogTitle">Time log</h2>
+          </div>
+          <button class="icon-button" value="cancel" type="button" data-action="close-time-log-dialog" aria-label="Close">Close</button>
+        </div>
+        <div class="time-log-list" id="timeLogList"></div>
+        <div class="modal-actions">
+          <button class="button button-secondary" type="button" data-action="close-time-log-dialog">Close</button>
+          <button class="button button-primary" type="button" data-action="add-log-from-manager">Add time</button>
+        </div>
+      </div>
+    </dialog>
+
     <dialog class="modal" id="logDialog">
       <form id="logForm" method="dialog">
         <div class="modal-header">
-          <h2>Add time</h2>
+          <h2 id="logDialogTitle">Add time</h2>
           <button class="icon-button" value="cancel" type="button" data-action="close-log-dialog" aria-label="Close">Close</button>
         </div>
         <input id="logTaskIdInput" type="hidden">
+        <input id="logIdInput" type="hidden">
+        <label class="field">
+          <span>Start time</span>
+          <input id="logStartInput" type="datetime-local">
+        </label>
+        <label class="field">
+          <span>Stop time</span>
+          <input id="logEndInput" type="datetime-local">
+        </label>
         <label class="field">
           <span>Amount in minutes</span>
-          <input id="manualMinutesInput" min="1" step="1" type="number" required>
+          <input id="manualMinutesInput" min="0.01" step="0.01" type="number">
         </label>
         <div class="modal-actions">
           <button class="button button-secondary" type="button" data-action="close-log-dialog">Cancel</button>

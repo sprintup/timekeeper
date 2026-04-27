@@ -6,8 +6,8 @@ const state = {
 };
 
 const elements = {};
-let draggedTaskId = null;
-let draggedRowIndex = null;
+let activeDrag = null;
+let activeTimeLogTaskId = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   cacheElements();
@@ -22,6 +22,12 @@ function cacheElements() {
   elements.board = document.getElementById("board");
   elements.todayDate = document.getElementById("todayDate");
   elements.taskTemplate = document.getElementById("taskCardTemplate");
+  elements.todayTotalTime = document.getElementById("todayTotalTime");
+  elements.bucketTotalElements = {
+    Admin: document.getElementById("adminTotalTime"),
+    Operations: document.getElementById("operationsTotalTime"),
+    Projects: document.getElementById("projectsTotalTime"),
+  };
   elements.deleteTimeLogsButton = document.getElementById("deleteTimeLogsButton");
   elements.generateReportButton = document.getElementById("generateReportButton");
   elements.resetStateButton = document.getElementById("resetStateButton");
@@ -38,8 +44,16 @@ function cacheElements() {
 
   elements.logDialog = document.getElementById("logDialog");
   elements.logForm = document.getElementById("logForm");
+  elements.logDialogTitle = document.getElementById("logDialogTitle");
   elements.logTaskIdInput = document.getElementById("logTaskIdInput");
+  elements.logIdInput = document.getElementById("logIdInput");
+  elements.logStartInput = document.getElementById("logStartInput");
+  elements.logEndInput = document.getElementById("logEndInput");
   elements.manualMinutesInput = document.getElementById("manualMinutesInput");
+
+  elements.timeLogDialog = document.getElementById("timeLogDialog");
+  elements.timeLogDialogTitle = document.getElementById("timeLogDialogTitle");
+  elements.timeLogList = document.getElementById("timeLogList");
 
   elements.reportDialog = document.getElementById("reportDialog");
   elements.reportForm = document.getElementById("reportForm");
@@ -57,6 +71,9 @@ function bindEvents() {
 
   document.addEventListener("click", handleDocumentClick);
   document.addEventListener("change", handleDocumentChange);
+  document.addEventListener("pointermove", handleBoardPointerMove);
+  document.addEventListener("pointerup", handleBoardPointerUp);
+  document.addEventListener("pointercancel", cancelActiveDrag);
 }
 
 function handleDocumentClick(event) {
@@ -76,6 +93,13 @@ function handleDocumentClick(event) {
 
   if (action === "close-log-dialog") {
     closeDialog(elements.logDialog);
+    reopenActiveTimeLogDialog();
+    return;
+  }
+
+  if (action === "close-time-log-dialog") {
+    activeTimeLogTaskId = null;
+    closeDialog(elements.timeLogDialog);
     return;
   }
 
@@ -91,6 +115,13 @@ function handleDocumentClick(event) {
 
   if (action === "add-side-quest") {
     openTaskDialog("add", "side", null, Number(actionElement.dataset.rowIndex));
+    return;
+  }
+
+  if (action === "add-log-from-manager") {
+    if (activeTimeLogTaskId) {
+      openLogDialog(activeTimeLogTaskId);
+    }
     return;
   }
 
@@ -123,6 +154,14 @@ function handleDocumentClick(event) {
 
   if (action === "add-log") {
     openLogDialog(taskId);
+  }
+
+  if (action === "show-log") {
+    openTimeLogDialog(taskId);
+  }
+
+  if (action === "edit-log") {
+    openLogDialog(taskId, actionElement.dataset.logId);
   }
 
   if (action === "delete-log") {
@@ -221,25 +260,19 @@ function render() {
     const row = document.createElement("section");
     row.className = "task-row";
     row.dataset.rowIndex = String(rowIndex);
-    row.addEventListener("dragover", handleRowDragOver);
-    row.addEventListener("dragleave", handleRowDragLeave);
-    row.addEventListener("drop", handleRowDrop);
 
     const label = document.createElement("div");
     label.className = "row-label";
     label.innerHTML = `
-      <span class="drag-handle row-drag-handle" draggable="true" aria-label="Drag row" role="img">::::</span>
+      <span class="drag-handle row-drag-handle" aria-label="Drag row" role="img" title="Drag row">::::</span>
       <strong>Row ${rowIndex + 1}</strong>
       <span>${rowIndex === 0 ? "Highest" : "Lower"}</span>
     `;
-    label.querySelector(".row-drag-handle").addEventListener("dragstart", handleRowDragStart);
-    label.querySelector(".row-drag-handle").addEventListener("dragend", handleRowDragEnd);
+    label.querySelector(".row-drag-handle").addEventListener("pointerdown", handleRowPointerDown);
 
     const track = document.createElement("div");
     track.className = "task-track";
     track.dataset.rowIndex = String(rowIndex);
-    track.addEventListener("dragover", handleDragOver);
-    track.addEventListener("drop", handleDrop);
 
     tasks.forEach((task) => {
       track.appendChild(createTaskCard(task));
@@ -297,20 +330,20 @@ function createAddTaskFooter(isEmptyBoard = false) {
 function createTaskCard(task) {
   const fragment = elements.taskTemplate.content.cloneNode(true);
   const card = fragment.querySelector(".task-card");
+  const dragHandle = fragment.querySelector(".task-drag-handle");
   const bucket = fragment.querySelector(".bucket-select");
   const objective = fragment.querySelector(".task-objective");
   const started = fragment.querySelector(".started-time");
   const elapsed = fragment.querySelector(".elapsed-time");
   const finished = fragment.querySelector(".finished-time");
   const toggleButton = fragment.querySelector('[data-action="toggle-timer"]');
-  const logList = fragment.querySelector(".log-list");
+  const timeLogButton = fragment.querySelector('[data-action="show-log"]');
 
   card.dataset.taskId = task.id;
   card.classList.toggle("is-running", isTaskRunning(task));
   card.classList.toggle("is-finished", task.status === "finished");
   card.classList.toggle("is-unstarted", !getFirstStartedAt(task));
-  card.addEventListener("dragstart", handleDragStart);
-  card.addEventListener("dragend", handleDragEnd);
+  dragHandle.addEventListener("pointerdown", handleTaskPointerDown);
 
   bucket.value = task.bucket;
   bucket.dataset.bucket = task.bucket;
@@ -320,28 +353,47 @@ function createTaskCard(task) {
   elapsed.textContent = formatDuration(getTaskElapsed(task));
   finished.textContent = task.finishedAt ? formatTime(task.finishedAt) : "";
   toggleButton.textContent = isTaskRunning(task) ? "Pause" : "Start";
+  timeLogButton.textContent = `Show time log (${task.logs.length})`;
 
-  renderLogList(logList, task);
   return fragment;
 }
 
-function renderLogList(logList, task) {
-  logList.innerHTML = "";
+function renderTimeLogModal() {
+  const task = findTask(activeTimeLogTaskId);
+  if (!task) {
+    activeTimeLogTaskId = null;
+    closeDialog(elements.timeLogDialog);
+    return;
+  }
+
+  elements.timeLogDialogTitle.textContent = task.objective;
+  elements.timeLogList.innerHTML = "";
 
   if (task.logs.length === 0) {
     const empty = document.createElement("p");
     empty.className = "empty-log";
     empty.textContent = "No time logged.";
-    logList.appendChild(empty);
+    elements.timeLogList.appendChild(empty);
     return;
   }
 
   task.logs.forEach((log) => {
     const item = document.createElement("div");
     item.className = "log-item";
+    item.dataset.taskId = task.id;
 
     const details = document.createElement("span");
     details.textContent = formatLogLabel(log);
+
+    const actions = document.createElement("div");
+    actions.className = "log-actions";
+
+    const editButton = document.createElement("button");
+    editButton.className = "button button-small";
+    editButton.dataset.action = "edit-log";
+    editButton.dataset.logId = log.id;
+    editButton.type = "button";
+    editButton.textContent = "Edit";
 
     const deleteButton = document.createElement("button");
     deleteButton.className = "button button-small button-danger";
@@ -350,96 +402,150 @@ function renderLogList(logList, task) {
     deleteButton.type = "button";
     deleteButton.textContent = "Delete";
 
-    item.append(details, deleteButton);
-    logList.appendChild(item);
+    actions.append(editButton, deleteButton);
+    item.append(details, actions);
+    elements.timeLogList.appendChild(item);
   });
 }
 
-function handleDragStart(event) {
-  event.stopPropagation();
-  draggedTaskId = event.currentTarget.dataset.taskId;
-  event.dataTransfer.effectAllowed = "move";
-  event.dataTransfer.setData("text/plain", draggedTaskId);
-  window.setTimeout(() => event.currentTarget.classList.add("is-dragging"), 0);
-}
+function handleTaskPointerDown(event) {
+  if (event.button !== 0) {
+    return;
+  }
 
-function handleDragOver(event) {
-  const track = event.currentTarget;
-  const draggingCard = document.querySelector(".task-card.is-dragging");
-  if (!draggingCard) {
+  const card = event.currentTarget.closest(".task-card");
+  if (!card) {
     return;
   }
 
   event.preventDefault();
-  event.stopPropagation();
-  const afterElement = getDragAfterElement(track, event.clientX);
-  if (afterElement) {
-    track.insertBefore(draggingCard, afterElement);
-  } else {
-    const sideQuestButton = track.querySelector(".side-quest-tile");
-    if (sideQuestButton) {
-      track.insertBefore(draggingCard, sideQuestButton);
-    } else {
-      track.appendChild(draggingCard);
+  activeDrag = {
+    type: "task",
+    card,
+    handle: event.currentTarget,
+    pointerId: event.pointerId,
+  };
+  card.classList.add("is-dragging");
+  document.body.classList.add("is-board-dragging");
+  event.currentTarget.setPointerCapture?.(event.pointerId);
+}
+
+function handleRowPointerDown(event) {
+  if (event.button !== 0) {
+    return;
+  }
+
+  const row = event.currentTarget.closest(".task-row");
+  if (!row) {
+    return;
+  }
+
+  event.preventDefault();
+  activeDrag = {
+    type: "row",
+    fromIndex: Number(row.dataset.rowIndex),
+    targetIndex: Number(row.dataset.rowIndex),
+    handle: event.currentTarget,
+    pointerId: event.pointerId,
+  };
+  row.classList.add("is-row-dragging", "is-row-drop-target");
+  document.body.classList.add("is-board-dragging");
+  event.currentTarget.setPointerCapture?.(event.pointerId);
+}
+
+function handleBoardPointerMove(event) {
+  if (!activeDrag) {
+    return;
+  }
+
+  event.preventDefault();
+
+  if (activeDrag.type === "task") {
+    moveDraggedTask(event.clientX, event.clientY);
+    return;
+  }
+
+  moveDraggedRowTarget(event.clientX, event.clientY);
+}
+
+function handleBoardPointerUp() {
+  if (!activeDrag) {
+    return;
+  }
+
+  if (activeDrag.type === "task") {
+    syncOrderFromDom();
+    cancelActiveDrag();
+    render();
+    return;
+  }
+
+  if (Number.isFinite(activeDrag.targetIndex)) {
+    moveRow(activeDrag.fromIndex, activeDrag.targetIndex);
+  }
+  cancelActiveDrag();
+  render();
+}
+
+function cancelActiveDrag() {
+  if (activeDrag?.handle && activeDrag.pointerId !== undefined) {
+    try {
+      activeDrag.handle.releasePointerCapture?.(activeDrag.pointerId);
+    } catch (error) {
+      // Pointer capture can already be released when the pointer leaves the window.
     }
   }
-}
 
-function handleDrop(event) {
-  if (!draggedTaskId) {
-    return;
-  }
-
-  event.preventDefault();
-  event.stopPropagation();
-  syncOrderFromDom();
-  draggedTaskId = null;
-  render();
-}
-
-function handleDragEnd() {
-  syncOrderFromDom();
-  draggedTaskId = null;
-  render();
-}
-
-function handleRowDragStart(event) {
-  draggedRowIndex = Number(event.currentTarget.closest(".task-row").dataset.rowIndex);
-  event.dataTransfer.effectAllowed = "move";
-  event.dataTransfer.setData("text/plain", String(draggedRowIndex));
-  event.currentTarget.closest(".task-row").classList.add("is-row-dragging");
-}
-
-function handleRowDragOver(event) {
-  if (draggedRowIndex === null) {
-    return;
-  }
-
-  event.preventDefault();
-  event.currentTarget.classList.add("is-row-drop-target");
-}
-
-function handleRowDragLeave(event) {
-  event.currentTarget.classList.remove("is-row-drop-target");
-}
-
-function handleRowDrop(event) {
-  if (draggedRowIndex === null) {
-    return;
-  }
-
-  event.preventDefault();
-  const targetRowIndex = Number(event.currentTarget.dataset.rowIndex);
-  moveRow(draggedRowIndex, targetRowIndex);
-  draggedRowIndex = null;
-  render();
-}
-
-function handleRowDragEnd() {
-  document.querySelectorAll(".is-row-dragging, .is-row-drop-target").forEach((row) => {
-    row.classList.remove("is-row-dragging", "is-row-drop-target");
+  document.body.classList.remove("is-board-dragging");
+  document.querySelectorAll(".is-dragging, .is-row-dragging, .is-row-drop-target").forEach((element) => {
+    element.classList.remove("is-dragging", "is-row-dragging", "is-row-drop-target");
   });
-  draggedRowIndex = null;
+  activeDrag = null;
+}
+
+function moveDraggedTask(x, y) {
+  const track = getTrackFromPoint(x, y);
+  if (!track || !activeDrag?.card) {
+    return;
+  }
+
+  const afterElement = getDragAfterElement(track, x);
+  if (afterElement) {
+    track.insertBefore(activeDrag.card, afterElement);
+    return;
+  }
+
+  const sideQuestButton = track.querySelector(".side-quest-tile");
+  if (sideQuestButton) {
+    track.insertBefore(activeDrag.card, sideQuestButton);
+  } else {
+    track.appendChild(activeDrag.card);
+  }
+}
+
+function moveDraggedRowTarget(x, y) {
+  const row = getRowFromPoint(x, y);
+  if (!row) {
+    return;
+  }
+
+  document.querySelectorAll(".is-row-drop-target").forEach((candidate) => {
+    candidate.classList.remove("is-row-drop-target");
+  });
+  row.classList.add("is-row-drop-target");
+  activeDrag.targetIndex = Number(row.dataset.rowIndex);
+}
+
+function getTrackFromPoint(x, y) {
+  return document.elementsFromPoint(x, y)
+    .map((element) => element.closest?.(".task-track"))
+    .find(Boolean);
+}
+
+function getRowFromPoint(x, y) {
+  return document.elementsFromPoint(x, y)
+    .map((element) => element.closest?.(".task-row"))
+    .find(Boolean);
 }
 
 function moveRow(fromIndex, toIndex) {
@@ -555,34 +661,131 @@ function createTask({ objective, bucket, placement, rowIndex }) {
   };
 }
 
-function openLogDialog(taskId) {
+function openTimeLogDialog(taskId) {
+  const task = findTask(taskId);
+  if (!task) {
+    return;
+  }
+
+  activeTimeLogTaskId = taskId;
+  renderTimeLogModal();
+  openDialog(elements.timeLogDialog);
+}
+
+function reopenActiveTimeLogDialog() {
+  if (!activeTimeLogTaskId) {
+    return;
+  }
+
+  renderTimeLogModal();
+  openDialog(elements.timeLogDialog);
+}
+
+function openLogDialog(taskId, logId = "") {
+  const task = findTask(taskId);
+  if (!task) {
+    return;
+  }
+
+  const log = logId ? task.logs.find((candidate) => candidate.id === logId) : null;
+  closeDialog(elements.timeLogDialog);
+  elements.logDialogTitle.textContent = log ? "Edit time log" : "Add time";
   elements.logTaskIdInput.value = taskId;
-  elements.manualMinutesInput.value = "";
+  elements.logIdInput.value = log?.id || "";
+  elements.logStartInput.value = log?.start ? toDateTimeLocalValue(log.start) : "";
+  elements.logEndInput.value = log?.end ? toDateTimeLocalValue(log.end) : "";
+  elements.manualMinutesInput.value = log && !isLogRunning(log) ? minutesFromMs(getLogDuration(log)).toFixed(2) : "";
   openDialog(elements.logDialog);
-  elements.manualMinutesInput.focus();
+  if (log?.start) {
+    elements.logStartInput.focus();
+  } else {
+    elements.manualMinutesInput.focus();
+  }
 }
 
 function saveManualLogFromDialog(event) {
   event.preventDefault();
 
   const task = findTask(elements.logTaskIdInput.value);
-  const minutes = Number(elements.manualMinutesInput.value);
-  if (!task || !Number.isFinite(minutes) || minutes <= 0) {
+  if (!task) {
     return;
   }
 
-  task.logs.push({
-    id: createId(),
-    start: null,
-    end: null,
-    durationMs: Math.round(minutes * 60 * 1000),
-    manual: true,
-    createdAt: new Date().toISOString(),
+  const logId = elements.logIdInput.value;
+  const minutes = Number(elements.manualMinutesInput.value);
+  const draft = buildLogDraft({
+    existingLog: logId ? task.logs.find((log) => log.id === logId) : null,
+    startValue: elements.logStartInput.value,
+    endValue: elements.logEndInput.value,
+    minutes,
   });
 
+  if (!draft) {
+    return;
+  }
+
+  if (logId) {
+    const logIndex = task.logs.findIndex((log) => log.id === logId);
+    if (logIndex >= 0) {
+      task.logs[logIndex] = { ...task.logs[logIndex], ...draft };
+    }
+  } else {
+    task.logs.push({
+      id: createId(),
+      ...draft,
+    });
+  }
+
+  enforceSingleRunningLog();
   saveState();
   closeDialog(elements.logDialog);
+  reopenActiveTimeLogDialog();
   render();
+}
+
+function buildLogDraft({ existingLog, startValue, endValue, minutes }) {
+  const now = new Date();
+  const durationMs = Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes * 60 * 1000) : 0;
+
+  if (!startValue) {
+    if (durationMs <= 0) {
+      window.alert("Enter an amount of time, or add a start time.");
+      return null;
+    }
+
+    return {
+      start: null,
+      end: null,
+      durationMs,
+      manual: true,
+      createdAt: existingLog?.createdAt || now.toISOString(),
+    };
+  }
+
+  const start = new Date(startValue);
+  if (Number.isNaN(start.getTime())) {
+    window.alert("Enter a valid start time.");
+    return null;
+  }
+
+  let end = null;
+  if (endValue) {
+    end = new Date(endValue);
+    if (Number.isNaN(end.getTime()) || end < start) {
+      window.alert("Enter a stop time after the start time.");
+      return null;
+    }
+  } else if (durationMs > 0) {
+    end = new Date(start.getTime() + durationMs);
+  }
+
+  return {
+    start: start.toISOString(),
+    end: end ? end.toISOString() : null,
+    durationMs: end ? Math.max(0, end.getTime() - start.getTime()) : 0,
+    manual: false,
+    createdAt: existingLog?.createdAt || start.toISOString(),
+  };
 }
 
 function toggleTimer(taskId) {
@@ -701,6 +904,9 @@ function deleteLog(taskId, logId) {
 
   task.logs = task.logs.filter((log) => log.id !== logId);
   saveState();
+  if (activeTimeLogTaskId === taskId) {
+    renderTimeLogModal();
+  }
   render();
 }
 
@@ -723,6 +929,9 @@ function deleteTimeLogs() {
     task.logs = [];
   });
   saveState();
+  if (activeTimeLogTaskId) {
+    renderTimeLogModal();
+  }
   render();
 }
 
@@ -737,7 +946,11 @@ function resetStateWithPrompt() {
   }
 
   state.tasks = [];
+  activeTimeLogTaskId = null;
   window.localStorage.removeItem(STORAGE_KEY);
+  closeDialog(elements.timeLogDialog);
+  closeDialog(elements.logDialog);
+  closeDialog(elements.reportDialog);
   render();
 }
 
@@ -793,6 +1006,9 @@ function renderReportPreview() {
   const heading = document.createElement("h3");
   heading.textContent = report.rangeLabel;
 
+  const summaryHeading = document.createElement("h4");
+  summaryHeading.textContent = "Summary";
+
   const totals = document.createElement("dl");
   BUCKETS.forEach((bucket) => {
     const term = document.createElement("dt");
@@ -802,6 +1018,23 @@ function renderReportPreview() {
     totals.append(term, detail);
   });
 
+  const timelineHeading = document.createElement("h4");
+  timelineHeading.textContent = "Timeline";
+  const timelineList = document.createElement("ul");
+  if (report.timeline.length === 0) {
+    const item = document.createElement("li");
+    item.textContent = "No time logged.";
+    timelineList.appendChild(item);
+  } else {
+    report.timeline.forEach((entry) => {
+      const item = document.createElement("li");
+      item.textContent = formatTimelineEntry(entry);
+      timelineList.appendChild(item);
+    });
+  }
+
+  const objectiveHeading = document.createElement("h4");
+  objectiveHeading.textContent = "Objectives";
   const objectiveList = document.createElement("ul");
   if (report.objectives.length === 0) {
     const item = document.createElement("li");
@@ -815,7 +1048,7 @@ function renderReportPreview() {
     });
   }
 
-  elements.reportPreview.append(heading, totals, objectiveList);
+  elements.reportPreview.append(heading, summaryHeading, totals, timelineHeading, timelineList, objectiveHeading, objectiveList);
 }
 
 function downloadReportFromDialog(event) {
@@ -844,14 +1077,16 @@ function buildReport() {
   const reportEnd = new Date();
   const totals = Object.fromEntries(BUCKETS.map((bucket) => [bucket, 0]));
   const objectives = [];
+  const timeline = [];
 
   getSortedTasks().forEach((task) => {
     const logEntries = task.logs
-      .map((log) => createReportLogEntry(log, reportStart, reportEnd))
+      .map((log) => createReportLogEntry(log, task, reportStart, reportEnd))
       .filter(Boolean);
     const durationMs = logEntries.reduce((total, log) => total + log.durationMs, 0);
 
     totals[task.bucket] += durationMs;
+    timeline.push(...logEntries);
     if (durationMs > 0) {
       objectives.push({
         objective: task.objective,
@@ -866,6 +1101,7 @@ function buildReport() {
     rangeLabel: `${formatDateTime(reportStart)} - ${formatDateTime(reportEnd)}`,
     totals,
     objectives,
+    timeline: timeline.sort((a, b) => a.sortTime - b.sortTime),
   };
 }
 
@@ -881,6 +1117,16 @@ function buildReportText() {
   BUCKETS.forEach((bucket) => {
     lines.push(`${bucket} - ${formatDuration(report.totals[bucket])}`);
   });
+
+  lines.push("", "Timeline");
+
+  if (report.timeline.length === 0) {
+    lines.push("No time logged.");
+  } else {
+    report.timeline.forEach((entry) => {
+      lines.push(formatTimelineEntry(entry));
+    });
+  }
 
   lines.push("", "Objectives");
 
@@ -930,6 +1176,10 @@ function getRunningLog(task) {
   return task.logs.find((log) => !log.manual && log.start && !log.end);
 }
 
+function isLogRunning(log) {
+  return Boolean(log && !log.manual && log.start && !log.end);
+}
+
 function isTaskRunning(task) {
   return Boolean(getRunningLog(task));
 }
@@ -971,14 +1221,20 @@ function formatLogLabel(log) {
   return `${start} - ${end} (${duration})`;
 }
 
-function createReportLogEntry(log, reportStart, reportEnd) {
+function createReportLogEntry(log, task, reportStart, reportEnd) {
   const durationMs = getLogDurationWithinRange(log, reportStart, reportEnd);
   if (durationMs <= 0) {
     return null;
   }
 
+  const logWindow = getReportLogWindow(log, reportStart, reportEnd);
   return {
     durationMs,
+    objective: task.objective,
+    bucket: task.bucket,
+    start: logWindow.start,
+    end: logWindow.end,
+    sortTime: logWindow.sortTime,
     label: formatReportLogLabel(log, durationMs, reportStart, reportEnd),
   };
 }
@@ -1003,7 +1259,8 @@ function getLogDurationWithinRange(log, reportStart, reportEnd) {
 function formatReportLogLabel(log, durationMs, reportStart, reportEnd) {
   const duration = formatDuration(durationMs);
   if (log.manual) {
-    return `Manual entry - ${duration}`;
+    const createdAt = log.createdAt ? formatTime(log.createdAt) : "Manual entry";
+    return `Manual entry at ${createdAt} (${duration})`;
   }
 
   const start = new Date(Math.max(new Date(log.start).getTime(), reportStart.getTime()));
@@ -1012,8 +1269,37 @@ function formatReportLogLabel(log, durationMs, reportStart, reportEnd) {
   return `${formatTime(start)} - ${log.end ? formatTime(end) : "Running"} (${duration})`;
 }
 
+function getReportLogWindow(log, reportStart, reportEnd) {
+  if (log.manual) {
+    const createdAt = new Date(log.createdAt || Date.now());
+    const sortTime = Math.min(Math.max(createdAt.getTime(), reportStart.getTime()), reportEnd.getTime());
+    return {
+      start: null,
+      end: null,
+      sortTime,
+    };
+  }
+
+  const start = new Date(Math.max(new Date(log.start).getTime(), reportStart.getTime()));
+  const sourceEnd = log.end ? new Date(log.end) : new Date();
+  const end = new Date(Math.min(sourceEnd.getTime(), reportEnd.getTime()));
+  return {
+    start,
+    end: log.end ? end : null,
+    sortTime: start.getTime(),
+  };
+}
+
+function formatTimelineEntry(entry) {
+  const timeRange = entry.start
+    ? `${formatTime(entry.start)} - ${entry.end ? formatTime(entry.end) : "Running"}`
+    : entry.label.replace(/\s+\(.+\)$/, "");
+  return `${timeRange} | ${entry.bucket} | ${entry.objective} (${formatDuration(entry.durationMs)})`;
+}
+
 function tick() {
   updateDate();
+  updateTodayTotals();
   document.querySelectorAll("[data-elapsed-task-id]").forEach((element) => {
     const task = findTask(element.dataset.elapsedTaskId);
     if (task) {
@@ -1024,6 +1310,19 @@ function tick() {
   if (elements.reportDialog.open) {
     renderReportPreview();
   }
+
+  if (elements.timeLogDialog.open) {
+    renderTimeLogModal();
+  }
+}
+
+function updateTodayTotals() {
+  const report = buildReport();
+  const totalMs = BUCKETS.reduce((total, bucket) => total + report.totals[bucket], 0);
+  elements.todayTotalTime.textContent = formatDuration(totalMs);
+  BUCKETS.forEach((bucket) => {
+    elements.bucketTotalElements[bucket].textContent = formatDuration(report.totals[bucket]);
+  });
 }
 
 function updateDate() {
@@ -1046,12 +1345,26 @@ function formatDuration(ms) {
   return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
 }
 
+function minutesFromMs(ms) {
+  return Math.max(0, ms) / 60000;
+}
+
 function formatTime(value) {
   return new Intl.DateTimeFormat(undefined, {
     hour: "numeric",
     minute: "2-digit",
     second: "2-digit",
   }).format(new Date(value));
+}
+
+function toDateTimeLocalValue(value) {
+  const date = new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
 function formatDateTime(value) {
@@ -1080,6 +1393,10 @@ function startOfToday() {
 }
 
 function openDialog(dialog) {
+  if (dialog.open) {
+    return;
+  }
+
   if (typeof dialog.showModal === "function") {
     dialog.showModal();
   } else {
@@ -1089,7 +1406,9 @@ function openDialog(dialog) {
 
 function closeDialog(dialog) {
   if (typeof dialog.close === "function") {
-    dialog.close();
+    if (dialog.open) {
+      dialog.close();
+    }
   } else {
     dialog.removeAttribute("open");
   }
