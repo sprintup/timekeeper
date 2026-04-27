@@ -22,8 +22,10 @@ function cacheElements() {
   elements.board = document.getElementById("board");
   elements.todayDate = document.getElementById("todayDate");
   elements.taskTemplate = document.getElementById("taskCardTemplate");
-  elements.deleteCompletedButton = document.getElementById("deleteCompletedButton");
+  elements.deleteTimeLogsButton = document.getElementById("deleteTimeLogsButton");
   elements.generateReportButton = document.getElementById("generateReportButton");
+  elements.resetStateButton = document.getElementById("resetStateButton");
+  elements.githubPageLink = document.getElementById("githubPageLink");
 
   elements.taskDialog = document.getElementById("taskDialog");
   elements.taskForm = document.getElementById("taskForm");
@@ -46,8 +48,9 @@ function cacheElements() {
 }
 
 function bindEvents() {
-  elements.deleteCompletedButton.addEventListener("click", deleteCompletedTasksWithPrompt);
+  elements.deleteTimeLogsButton.addEventListener("click", deleteTimeLogsWithPrompt);
   elements.generateReportButton.addEventListener("click", openReportDialog);
+  elements.resetStateButton.addEventListener("click", resetStateWithPrompt);
   elements.taskForm.addEventListener("submit", saveTaskFromDialog);
   elements.logForm.addEventListener("submit", saveManualLogFromDialog);
   elements.reportForm.addEventListener("submit", downloadReportFromDialog);
@@ -532,13 +535,19 @@ function saveTaskFromDialog(event) {
 
 function createTask({ objective, bucket, placement, rowIndex }) {
   const row = placement === "side" ? (Number.isFinite(rowIndex) ? rowIndex : 0) : getBottomRowIndex() + 1;
+  const order = placement === "side" ? 0 : getNextOrder(row);
+
+  if (placement === "side") {
+    makeRoomAtLeft(row);
+  }
+
   return {
     id: createId(),
     objective,
     bucket,
     status: "active",
     row,
-    order: getNextOrder(row),
+    order,
     createdAt: new Date().toISOString(),
     finishedAt: null,
     logs: [],
@@ -600,6 +609,7 @@ function startTask(task) {
   });
 
   promoteTaskIfNeeded(task);
+  promoteTaskUrgency(task);
   task.status = "active";
   task.finishedAt = null;
   task.logs.push({
@@ -693,24 +703,40 @@ function deleteLog(taskId, logId) {
   render();
 }
 
-function deleteCompletedTasksWithPrompt() {
-  const count = state.tasks.filter((task) => task.status === "finished").length;
-  if (count === 0) {
+function deleteTimeLogsWithPrompt() {
+  const logCount = getTimeLogCount();
+  if (logCount === 0) {
     return;
   }
 
-  const confirmed = window.confirm(`Delete ${count} completed task${count === 1 ? "" : "s"}?`);
+  const confirmed = window.confirm(`Delete ${logCount} time log${logCount === 1 ? "" : "s"}? Task boxes will stay.`);
   if (!confirmed) {
     return;
   }
 
-  deleteCompletedTasks();
+  deleteTimeLogs();
 }
 
-function deleteCompletedTasks() {
-  state.tasks = state.tasks.filter((task) => task.status !== "finished");
-  normalizeBoard();
+function deleteTimeLogs() {
+  state.tasks.forEach((task) => {
+    task.logs = [];
+  });
   saveState();
+  render();
+}
+
+function getTimeLogCount() {
+  return state.tasks.reduce((total, task) => total + task.logs.length, 0);
+}
+
+function resetStateWithPrompt() {
+  const confirmed = window.confirm("Reset Timekeeper? This clears all saved task boxes and time logs from this browser.");
+  if (!confirmed) {
+    return;
+  }
+
+  state.tasks = [];
+  window.localStorage.removeItem(STORAGE_KEY);
   render();
 }
 
@@ -733,6 +759,24 @@ function promoteTaskIfNeeded(task) {
   task.row = 0;
   task.order = getNextOrder(0);
   normalizeBoard();
+}
+
+function promoteTaskUrgency(task) {
+  if (task.order === 0) {
+    return;
+  }
+
+  makeRoomAtLeft(task.row, task.id);
+  task.order = 0;
+  normalizeBoard();
+}
+
+function makeRoomAtLeft(row, taskIdToSkip = "") {
+  state.tasks.forEach((candidate) => {
+    if (candidate.row === row && candidate.id !== taskIdToSkip) {
+      candidate.order += 1;
+    }
+  });
 }
 
 function openReportDialog() {
@@ -787,11 +831,11 @@ function downloadReportFromDialog(event) {
   anchor.remove();
   URL.revokeObjectURL(url);
 
-  if (elements.deleteAfterReportInput.checked) {
-    deleteCompletedTasks();
-  }
-
   closeDialog(elements.reportDialog);
+
+  if (elements.deleteAfterReportInput.checked) {
+    deleteTimeLogs();
+  }
 }
 
 function buildReport() {
@@ -990,6 +1034,7 @@ function updateDate() {
     year: "numeric",
   }).format(now);
   elements.todayDate.dateTime = formatFileDate(now);
+  elements.githubPageLink.href = window.location.href.split("#")[0];
 }
 
 function formatDuration(ms) {
