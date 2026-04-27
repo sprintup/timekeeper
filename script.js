@@ -1,13 +1,20 @@
 const STORAGE_KEY = "timekeeper.tasks.v1";
 const BUCKETS = ["Admin", "Operations", "Projects"];
+const DEFAULT_TIME_GOAL_MS = 8 * 60 * 60 * 1000;
 
 const state = {
   tasks: [],
+  rows: [],
+  timeGoalMs: DEFAULT_TIME_GOAL_MS,
+  timeGoalCleared: false,
+  goalChimeKey: "",
 };
 
 const elements = {};
 let activeDrag = null;
 let activeTimeLogTaskId = null;
+let previousGoalRemainingMs = null;
+let chimeAudioContext = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   cacheElements();
@@ -23,15 +30,18 @@ function cacheElements() {
   elements.todayDate = document.getElementById("todayDate");
   elements.taskTemplate = document.getElementById("taskCardTemplate");
   elements.todayTotalTime = document.getElementById("todayTotalTime");
+  elements.timeGoalForm = document.getElementById("timeGoalForm");
+  elements.timeGoalHoursInput = document.getElementById("timeGoalHoursInput");
+  elements.timeGoalMinutesInput = document.getElementById("timeGoalMinutesInput");
+  elements.clearTimeGoalButton = document.getElementById("clearTimeGoalButton");
+  elements.timeGoalRemaining = document.getElementById("timeGoalRemaining");
   elements.bucketTotalElements = {
     Admin: document.getElementById("adminTotalTime"),
     Operations: document.getElementById("operationsTotalTime"),
     Projects: document.getElementById("projectsTotalTime"),
   };
-  elements.deleteTimeLogsButton = document.getElementById("deleteTimeLogsButton");
   elements.generateReportButton = document.getElementById("generateReportButton");
   elements.resetStateButton = document.getElementById("resetStateButton");
-  elements.githubPageLink = document.getElementById("githubPageLink");
 
   elements.taskDialog = document.getElementById("taskDialog");
   elements.taskForm = document.getElementById("taskForm");
@@ -41,6 +51,13 @@ function cacheElements() {
   elements.taskRowInput = document.getElementById("taskRowInput");
   elements.objectiveInput = document.getElementById("objectiveInput");
   elements.bucketInput = document.getElementById("bucketInput");
+  elements.taskCategoryGuide = document.getElementById("taskCategoryGuide");
+
+  elements.rowDialog = document.getElementById("rowDialog");
+  elements.rowForm = document.getElementById("rowForm");
+  elements.rowDialogTitle = document.getElementById("rowDialogTitle");
+  elements.rowIndexInput = document.getElementById("rowIndexInput");
+  elements.rowNameInput = document.getElementById("rowNameInput");
 
   elements.logDialog = document.getElementById("logDialog");
   elements.logForm = document.getElementById("logForm");
@@ -62,10 +79,12 @@ function cacheElements() {
 }
 
 function bindEvents() {
-  elements.deleteTimeLogsButton.addEventListener("click", deleteTimeLogsWithPrompt);
   elements.generateReportButton.addEventListener("click", openReportDialog);
   elements.resetStateButton.addEventListener("click", resetStateWithPrompt);
+  elements.timeGoalForm.addEventListener("submit", saveTimeGoalFromForm);
+  elements.clearTimeGoalButton.addEventListener("click", clearTimeGoal);
   elements.taskForm.addEventListener("submit", saveTaskFromDialog);
+  elements.rowForm.addEventListener("submit", saveRowFromDialog);
   elements.logForm.addEventListener("submit", saveManualLogFromDialog);
   elements.reportForm.addEventListener("submit", downloadReportFromDialog);
 
@@ -74,6 +93,7 @@ function bindEvents() {
   document.addEventListener("pointermove", handleBoardPointerMove);
   document.addEventListener("pointerup", handleBoardPointerUp);
   document.addEventListener("pointercancel", cancelActiveDrag);
+  document.addEventListener("pointerdown", primeChimeAudioForSavedGoal, { once: true });
 }
 
 function handleDocumentClick(event) {
@@ -88,6 +108,11 @@ function handleDocumentClick(event) {
 
   if (action === "close-task-dialog") {
     closeDialog(elements.taskDialog);
+    return;
+  }
+
+  if (action === "close-row-dialog") {
+    closeDialog(elements.rowDialog);
     return;
   }
 
@@ -108,8 +133,13 @@ function handleDocumentClick(event) {
     return;
   }
 
-  if (action === "add-task-row") {
-    openTaskDialog("add", "lower");
+  if (action === "add-row") {
+    openRowDialog("add");
+    return;
+  }
+
+  if (action === "edit-row") {
+    openRowDialog("edit", Number(actionElement.dataset.rowIndex));
     return;
   }
 
@@ -189,23 +219,44 @@ function loadState() {
   const stored = window.localStorage.getItem(STORAGE_KEY);
   if (!stored) {
     state.tasks = [];
+    state.rows = [];
+    state.timeGoalMs = DEFAULT_TIME_GOAL_MS;
+    state.timeGoalCleared = false;
+    state.goalChimeKey = "";
+    setTimeGoalInputs(state.timeGoalMs);
     return;
   }
 
   try {
     const parsed = JSON.parse(stored);
     state.tasks = Array.isArray(parsed.tasks) ? parsed.tasks.map(sanitizeTask).filter(Boolean) : [];
+    state.rows = Array.isArray(parsed.rows) ? parsed.rows.map(sanitizeRow).filter(Boolean) : [];
+    state.timeGoalCleared = parsed.timeGoalCleared === true;
+    state.timeGoalMs = state.timeGoalCleared ? sanitizeTimeGoal(parsed.timeGoalMs) : sanitizeTimeGoal(parsed.timeGoalMs, DEFAULT_TIME_GOAL_MS);
+    state.goalChimeKey = typeof parsed.goalChimeKey === "string" ? parsed.goalChimeKey : "";
+    setTimeGoalInputs(state.timeGoalMs);
     normalizeBoard();
     enforceSingleRunningLog();
     saveState();
   } catch (error) {
     console.warn("Unable to load saved tasks.", error);
     state.tasks = [];
+    state.rows = [];
+    state.timeGoalMs = DEFAULT_TIME_GOAL_MS;
+    state.timeGoalCleared = false;
+    state.goalChimeKey = "";
+    setTimeGoalInputs(state.timeGoalMs);
   }
 }
 
 function saveState() {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks: state.tasks }));
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    tasks: state.tasks,
+    rows: state.rows,
+    timeGoalMs: state.timeGoalMs,
+    timeGoalCleared: state.timeGoalCleared,
+    goalChimeKey: state.goalChimeKey,
+  }));
 }
 
 function sanitizeTask(task) {
@@ -246,9 +297,30 @@ function sanitizeLog(log) {
   };
 }
 
+function sanitizeRow(row, index) {
+  if (!row || typeof row !== "object") {
+    return null;
+  }
+
+  return {
+    id: String(row.id || createId()),
+    name: String(row.name || `Row ${index + 1}`).slice(0, 80),
+  };
+}
+
 function clampInteger(value, fallback) {
   const number = Number(value);
   return Number.isFinite(number) ? Math.max(0, Math.floor(number)) : fallback;
+}
+
+function sanitizeTimeGoal(value, fallback = 0) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) {
+    return fallback;
+  }
+
+  const sanitized = Math.max(0, Math.floor(number));
+  return sanitized > 0 ? sanitized : fallback;
 }
 
 function render() {
@@ -265,9 +337,11 @@ function render() {
     label.className = "row-label";
     label.innerHTML = `
       <span class="drag-handle row-drag-handle" aria-label="Drag row" role="img" title="Drag row">::::</span>
-      <strong>Row ${rowIndex + 1}</strong>
+      <strong></strong>
       <span>${rowIndex === 0 ? "Highest" : "Lower"}</span>
+      <button class="icon-button row-edit-button" data-action="edit-row" data-row-index="${rowIndex}" type="button">Rename</button>
     `;
+    label.querySelector("strong").textContent = getRowName(rowIndex);
     label.querySelector(".row-drag-handle").addEventListener("pointerdown", handleRowPointerDown);
 
     const track = document.createElement("div");
@@ -288,8 +362,8 @@ function render() {
 }
 
 function getRows() {
-  const maxRow = state.tasks.reduce((max, task) => Math.max(max, task.row), -1);
-  const rows = Array.from({ length: maxRow + 1 }, () => []);
+  ensureRowsForTasks();
+  const rows = Array.from({ length: state.rows.length }, () => []);
 
   state.tasks.forEach((task) => {
     if (!rows[task.row]) {
@@ -302,13 +376,17 @@ function getRows() {
   return rows;
 }
 
+function getRowName(rowIndex) {
+  return state.rows[rowIndex]?.name || `Row ${rowIndex + 1}`;
+}
+
 function createSideQuestButton(rowIndex) {
   const button = document.createElement("button");
   button.className = "side-quest-tile";
   button.dataset.action = "add-side-quest";
   button.dataset.rowIndex = String(rowIndex);
   button.type = "button";
-  button.textContent = "Add Side Quest";
+  button.textContent = "Add Task Box";
   return button;
 }
 
@@ -319,9 +397,9 @@ function createAddTaskFooter(isEmptyBoard = false) {
 
   const button = document.createElement("button");
   button.className = "add-task-tile";
-  button.dataset.action = "add-task-row";
+  button.dataset.action = "add-row";
   button.type = "button";
-  button.textContent = "Add Task Box";
+  button.textContent = "Add Row";
 
   footer.appendChild(button);
   return footer;
@@ -555,11 +633,13 @@ function moveRow(fromIndex, toIndex) {
 
   const rows = getRows();
   const [movedRow] = rows.splice(fromIndex, 1);
+  const [movedRowMeta] = state.rows.splice(fromIndex, 1);
   if (!movedRow) {
     return;
   }
 
   rows.splice(toIndex, 0, movedRow);
+  state.rows.splice(toIndex, 0, movedRowMeta || createRow(`Row ${toIndex + 1}`));
   rows.forEach((row, rowIndex) => {
     row.forEach((task, orderIndex) => {
       task.row = rowIndex;
@@ -600,6 +680,42 @@ function syncOrderFromDom() {
   saveState();
 }
 
+function openRowDialog(mode, rowIndex = "") {
+  const row = Number.isFinite(rowIndex) ? state.rows[rowIndex] : null;
+  elements.rowDialogTitle.textContent = mode === "edit" ? "Rename row" : "Add row";
+  elements.rowIndexInput.value = Number.isFinite(rowIndex) ? String(rowIndex) : "";
+  elements.rowNameInput.value = row?.name || "";
+  openDialog(elements.rowDialog);
+  elements.rowNameInput.focus();
+}
+
+function saveRowFromDialog(event) {
+  event.preventDefault();
+
+  const name = elements.rowNameInput.value.trim();
+  const rowIndex = elements.rowIndexInput.value === "" ? null : Number(elements.rowIndexInput.value);
+  if (!name) {
+    return;
+  }
+
+  if (Number.isFinite(rowIndex) && state.rows[rowIndex]) {
+    state.rows[rowIndex].name = name;
+  } else {
+    state.rows.push(createRow(name));
+  }
+
+  saveState();
+  closeDialog(elements.rowDialog);
+  render();
+}
+
+function createRow(name) {
+  return {
+    id: createId(),
+    name: String(name || "New Row").slice(0, 80),
+  };
+}
+
 function openTaskDialog(mode, placement, task = null, rowIndex = "") {
   elements.taskDialogTitle.textContent = mode === "edit" ? "Edit task box" : placement === "side" ? "Add side quest" : "Add task box";
   elements.taskIdInput.value = task?.id || "";
@@ -607,6 +723,8 @@ function openTaskDialog(mode, placement, task = null, rowIndex = "") {
   elements.taskRowInput.value = task ? String(task.row) : rowIndex === "" ? "" : String(rowIndex);
   elements.objectiveInput.value = task?.objective || "";
   elements.bucketInput.value = task?.bucket || (placement === "side" ? "Operations" : "Projects");
+  elements.taskCategoryGuide.hidden = placement !== "side";
+  elements.taskCategoryGuide.open = placement === "side";
   openDialog(elements.taskDialog);
   elements.objectiveInput.focus();
 }
@@ -644,6 +762,7 @@ function createTask({ objective, bucket, placement, rowIndex }) {
   const row = placement === "side" ? (Number.isFinite(rowIndex) ? rowIndex : 0) : getBottomRowIndex() + 1;
   const order = placement === "side" ? 0 : getNextOrder(row);
 
+  ensureRowIndex(row);
   if (placement === "side") {
     makeRoomAtLeft(row);
   }
@@ -863,6 +982,7 @@ function finishTask(taskId) {
   pauseTask(task, now);
   task.status = "finished";
   task.finishedAt = now.toISOString();
+  normalizeBoard();
   saveState();
   render();
 }
@@ -939,6 +1059,42 @@ function getTimeLogCount() {
   return state.tasks.reduce((total, task) => total + task.logs.length, 0);
 }
 
+function saveTimeGoalFromForm(event) {
+  event.preventDefault();
+
+  const hours = Number(elements.timeGoalHoursInput.value);
+  const minutes = Number(elements.timeGoalMinutesInput.value);
+  const safeHours = Number.isFinite(hours) ? Math.max(0, Math.floor(hours)) : 0;
+  const safeMinutes = Number.isFinite(minutes) ? Math.min(59, Math.max(0, Math.floor(minutes))) : 0;
+  const goalMs = ((safeHours * 60) + safeMinutes) * 60 * 1000;
+
+  if (goalMs <= 0) {
+    clearTimeGoal();
+    return;
+  }
+
+  const totalMs = getTodayTotalMs();
+  state.timeGoalMs = goalMs;
+  state.timeGoalCleared = false;
+  state.goalChimeKey = "";
+  previousGoalRemainingMs = Math.max(0, state.timeGoalMs - totalMs);
+  setTimeGoalInputs(state.timeGoalMs);
+  primeChimeAudio();
+  saveState();
+  updateTodayTotals();
+}
+
+function clearTimeGoal() {
+  state.timeGoalMs = 0;
+  state.timeGoalCleared = true;
+  state.goalChimeKey = "";
+  previousGoalRemainingMs = null;
+  elements.timeGoalHoursInput.value = "";
+  elements.timeGoalMinutesInput.value = "";
+  saveState();
+  updateTodayTotals();
+}
+
 function resetStateWithPrompt() {
   const confirmed = window.confirm("Reset Timekeeper? This clears all saved task boxes and time logs from this browser.");
   if (!confirmed) {
@@ -946,6 +1102,12 @@ function resetStateWithPrompt() {
   }
 
   state.tasks = [];
+  state.rows = [];
+  state.timeGoalMs = DEFAULT_TIME_GOAL_MS;
+  state.timeGoalCleared = false;
+  state.goalChimeKey = "";
+  previousGoalRemainingMs = null;
+  setTimeGoalInputs(state.timeGoalMs);
   activeTimeLogTaskId = null;
   window.localStorage.removeItem(STORAGE_KEY);
   closeDialog(elements.timeLogDialog);
@@ -995,7 +1157,7 @@ function makeRoomAtLeft(row, taskIdToSkip = "") {
 
 function openReportDialog() {
   renderReportPreview();
-  elements.deleteAfterReportInput.checked = false;
+  elements.deleteAfterReportInput.checked = true;
   openDialog(elements.reportDialog);
 }
 
@@ -1145,13 +1307,32 @@ function buildReportText() {
 }
 
 function normalizeBoard() {
-  const rows = getRows().filter((row) => row.length > 0);
+  ensureRowsForTasks();
+  const rows = getRows();
   rows.forEach((row, rowIndex) => {
-    row.forEach((task, orderIndex) => {
+    const sortedRow = [...row].sort((a, b) => {
+      const statusComparison = Number(a.status === "finished") - Number(b.status === "finished");
+      return statusComparison || a.order - b.order;
+    });
+
+    sortedRow.forEach((task, orderIndex) => {
       task.row = rowIndex;
       task.order = orderIndex;
     });
   });
+}
+
+function ensureRowsForTasks() {
+  const maxTaskRow = state.tasks.reduce((max, task) => Math.max(max, task.row), -1);
+  for (let rowIndex = state.rows.length; rowIndex <= maxTaskRow; rowIndex += 1) {
+    state.rows.push(createRow(`Row ${rowIndex + 1}`));
+  }
+}
+
+function ensureRowIndex(rowIndex) {
+  for (let index = state.rows.length; index <= rowIndex; index += 1) {
+    state.rows.push(createRow(`Row ${index + 1}`));
+  }
 }
 
 function getSortedTasks() {
@@ -1159,7 +1340,7 @@ function getSortedTasks() {
 }
 
 function getBottomRowIndex() {
-  return state.tasks.reduce((max, task) => Math.max(max, task.row), -1);
+  return Math.max(state.rows.length - 1, state.tasks.reduce((max, task) => Math.max(max, task.row), -1));
 }
 
 function getNextOrder(row) {
@@ -1323,18 +1504,57 @@ function updateTodayTotals() {
   BUCKETS.forEach((bucket) => {
     elements.bucketTotalElements[bucket].textContent = formatDuration(report.totals[bucket]);
   });
+  updateTimeGoal(totalMs);
+}
+
+function getTodayTotalMs() {
+  const report = buildReport();
+  return BUCKETS.reduce((total, bucket) => total + report.totals[bucket], 0);
+}
+
+function updateTimeGoal(totalMs) {
+  if (state.timeGoalMs <= 0) {
+    elements.timeGoalRemaining.textContent = "No goal set";
+    elements.timeGoalRemaining.classList.remove("is-complete");
+    previousGoalRemainingMs = null;
+    return;
+  }
+
+  const remainingMs = Math.max(0, state.timeGoalMs - totalMs);
+  const goalKey = `${formatFileDate(new Date())}:${state.timeGoalMs}`;
+  elements.timeGoalRemaining.textContent = formatDuration(remainingMs);
+  elements.timeGoalRemaining.classList.toggle("is-complete", remainingMs === 0);
+
+  if (remainingMs > 0 && state.goalChimeKey === goalKey) {
+    state.goalChimeKey = "";
+    saveState();
+  }
+
+  if (
+    remainingMs === 0
+    && previousGoalRemainingMs !== null
+    && previousGoalRemainingMs > 0
+    && state.goalChimeKey !== goalKey
+  ) {
+    state.goalChimeKey = goalKey;
+    saveState();
+    playGoalChime();
+  }
+
+  previousGoalRemainingMs = remainingMs;
 }
 
 function updateDate() {
-  const now = new Date();
-  elements.todayDate.textContent = new Intl.DateTimeFormat(undefined, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  }).format(now);
-  elements.todayDate.dateTime = formatFileDate(now);
-  elements.githubPageLink.href = window.location.href.split("#")[0];
+  if (elements.todayDate) {
+    const now = new Date();
+    elements.todayDate.textContent = new Intl.DateTimeFormat(undefined, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    }).format(now);
+    elements.todayDate.dateTime = formatFileDate(now);
+  }
 }
 
 function formatDuration(ms) {
@@ -1345,8 +1565,63 @@ function formatDuration(ms) {
   return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
 }
 
+function setTimeGoalInputs(ms) {
+  if (ms <= 0) {
+    elements.timeGoalHoursInput.value = "";
+    elements.timeGoalMinutesInput.value = "";
+    return;
+  }
+
+  const totalMinutes = Math.floor(ms / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  elements.timeGoalHoursInput.value = String(hours);
+  elements.timeGoalMinutesInput.value = String(minutes);
+}
+
 function minutesFromMs(ms) {
   return Math.max(0, ms) / 60000;
+}
+
+function primeChimeAudio() {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) {
+    return;
+  }
+
+  if (!chimeAudioContext) {
+    chimeAudioContext = new AudioContext();
+  }
+
+  chimeAudioContext.resume?.();
+}
+
+function primeChimeAudioForSavedGoal() {
+  if (state.timeGoalMs > 0) {
+    primeChimeAudio();
+  }
+}
+
+function playGoalChime() {
+  primeChimeAudio();
+  if (!chimeAudioContext) {
+    return;
+  }
+
+  const startTime = chimeAudioContext.currentTime;
+  [523.25, 659.25, 783.99].forEach((frequency, index) => {
+    const oscillator = chimeAudioContext.createOscillator();
+    const gain = chimeAudioContext.createGain();
+    const noteStart = startTime + index * 0.16;
+    oscillator.type = "sine";
+    oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.0001, noteStart);
+    gain.gain.exponentialRampToValueAtTime(0.18, noteStart + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, noteStart + 0.42);
+    oscillator.connect(gain).connect(chimeAudioContext.destination);
+    oscillator.start(noteStart);
+    oscillator.stop(noteStart + 0.44);
+  });
 }
 
 function formatTime(value) {

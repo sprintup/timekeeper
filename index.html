@@ -9,91 +9,71 @@
   <body>
     <div class="app-shell">
       <header class="app-header">
-        <div class="brand-block">
-          <p class="eyebrow">Today</p>
-          <h1>Timekeeper</h1>
-          <time id="todayDate" datetime=""></time>
-        </div>
-        <div class="header-actions" aria-label="Report actions">
-          <button class="button button-primary" id="generateReportButton" type="button">Generate today's report</button>
-          <button class="button button-secondary" id="deleteTimeLogsButton" type="button">Delete time logs</button>
-          <button class="button button-danger" id="resetStateButton" type="button">Reset</button>
-          <a class="button button-secondary" id="githubPageLink" href="./" target="_blank" rel="noreferrer">GitHub Page</a>
-        </div>
+        <section class="totals-panel" aria-labelledby="totalsTitle">
+          <h2 id="totalsTitle">Total Elapsed Time <span id="todayTotalTime">0h 00m 00s</span></h2>
+          <form class="time-goal-form" id="timeGoalForm">
+            <label class="time-goal-field">
+              <span>Goal Hours</span>
+              <input id="timeGoalHoursInput" min="0" step="1" type="number" placeholder="0">
+            </label>
+            <label class="time-goal-field">
+              <span>Goal Minutes</span>
+              <input id="timeGoalMinutesInput" max="59" min="0" step="1" type="number" placeholder="0">
+            </label>
+            <button class="button button-small button-secondary" type="submit">Set</button>
+            <button class="button button-small" id="clearTimeGoalButton" type="button">Clear</button>
+            <div class="time-goal-remaining">
+              <span>Remaining</span>
+              <strong id="timeGoalRemaining">No goal set</strong>
+            </div>
+          </form>
+          <dl class="totals-grid" id="todayTotals">
+            <div>
+              <dt>Admin</dt>
+              <dd id="adminTotalTime">0h 00m 00s</dd>
+            </div>
+            <div>
+              <dt>Operations</dt>
+              <dd id="operationsTotalTime">0h 00m 00s</dd>
+            </div>
+            <div>
+              <dt>Projects</dt>
+              <dd id="projectsTotalTime">0h 00m 00s</dd>
+            </div>
+          </dl>
+        </section>
       </header>
 
-      <section class="totals-panel" aria-labelledby="totalsTitle">
-        <div>
-          <p class="eyebrow">Today&apos;s Time</p>
-          <h2 id="totalsTitle">Total <span id="todayTotalTime">0h 00m 00s</span></h2>
+      <section class="top-control-panel">
+        <details class="instructions-panel">
+          <summary>Instructions</summary>
+          <div class="instructions-content">
+            <ol>
+              <li>Set a time goal, then use the remaining-time countdown to track progress against the day.</li>
+              <li>Add named rows for groups of work, then add task boxes inside the row where the work belongs.</li>
+              <li>Start one task at a time. Starting another task pauses the active timer and promotes the new task to the top-left priority position.</li>
+              <li>Use the drag handles to rearrange rows vertically or task boxes within and across rows.</li>
+              <li>Open Show time log to add, edit, or delete entries. Generate a report for bucket totals, objective totals, and the chronological timeline.</li>
+            </ol>
+          </div>
+        </details>
+        <div class="header-actions actions-panel" aria-label="Report actions">
+          <button class="button button-primary" id="generateReportButton" type="button">Generate today's report</button>
+          <button class="button button-danger" id="resetStateButton" type="button">Reset</button>
+          <a class="icon-button github-page-link" id="githubPageLink" href="https://github.com/sprintup/timekeeper" target="_blank" rel="noreferrer" aria-label="Open GitHub repository" title="GitHub repository">
+            <svg aria-hidden="true" viewBox="0 0 16 16" width="20" height="20">
+              <path d="M8 0C3.58 0 0 3.67 0 8.2c0 3.62 2.29 6.69 5.47 7.78.4.08.55-.18.55-.4v-1.4c-2.23.5-2.7-1.1-2.7-1.1-.36-.95-.89-1.2-.89-1.2-.73-.51.06-.5.06-.5.8.06 1.22.85 1.22.85.72 1.25 1.87.89 2.33.68.07-.53.28-.89.5-1.09-1.78-.21-3.64-.91-3.64-4.05 0-.9.31-1.63.82-2.2-.08-.21-.36-1.05.08-2.18 0 0 .67-.22 2.2.84A7.4 7.4 0 0 1 8 3.96c.68 0 1.36.09 2 .27 1.53-1.06 2.2-.84 2.2-.84.44 1.13.16 1.97.08 2.18.51.57.82 1.3.82 2.2 0 3.15-1.87 3.84-3.65 4.04.29.25.54.76.54 1.54v2.28c0 .22.15.48.55.4A8.1 8.1 0 0 0 16 8.2C16 3.67 12.42 0 8 0Z"></path>
+            </svg>
+          </a>
         </div>
-        <dl class="totals-grid" id="todayTotals">
-          <div>
-            <dt>Admin</dt>
-            <dd id="adminTotalTime">0h 00m 00s</dd>
-          </div>
-          <div>
-            <dt>Operations</dt>
-            <dd id="operationsTotalTime">0h 00m 00s</dd>
-          </div>
-          <div>
-            <dt>Projects</dt>
-            <dd id="projectsTotalTime">0h 00m 00s</dd>
-          </div>
-        </dl>
       </section>
-
-      <details class="instructions-panel">
-        <summary>Instructions</summary>
-        <div class="instructions-content">
-          <ol>
-            <li>Add a task box for work you want to accomplish today, then choose its bucket: Admin, Operations, or Projects.</li>
-            <li>Press Start to begin timing. Starting another task pauses the current timer automatically.</li>
-            <li>Starting a lower-priority task moves it to the highest-importance row and the highest-urgency position on the left.</li>
-            <li>Use Add Side Quest for interruptions, and use the drag handles to rearrange tasks or rows.</li>
-            <li>Open Show Time Log to add, edit, or delete entries. Generate a report when you want today&apos;s totals and timeline.</li>
-          </ol>
-        </div>
-      </details>
+      <div class="top-divider" aria-hidden="true"></div>
 
       <main class="workspace">
         <section class="board-panel" aria-labelledby="boardTitle">
-          <div class="board-toolbar">
-            <div>
-              <p class="eyebrow">Task Section</p>
-              <h2 id="boardTitle">Task boxes</h2>
-            </div>
-          </div>
-
-          <div class="axis-labels" aria-hidden="true">
-            <span>Importance: highest to lowest</span>
-            <span>Urgency: highest to lowest</span>
-          </div>
-
+          <h2 class="visually-hidden" id="boardTitle">Board</h2>
           <div class="board" id="board" aria-live="polite"></div>
         </section>
-
-        <aside class="bucket-guide" aria-labelledby="bucketGuideTitle">
-          <p class="eyebrow">Buckets</p>
-          <h2 id="bucketGuideTitle">Time categories</h2>
-          <div class="bucket-guide-list">
-            <section>
-              <h3>Admin</h3>
-              <p>Vacation, sick time, holidays, professional development, email, meetings not tied to a project.</p>
-              <p class="example">One-on-ones, team meetings, interviews.</p>
-            </section>
-            <section>
-              <h3>Operations</h3>
-              <p>Service requests, incidents, existing responsibilities, break/fix work, and product delivery support.</p>
-              <p class="example">Tickets, EMS, service-related activity.</p>
-            </section>
-            <section>
-              <h3>Projects</h3>
-              <p>Work requests with a temporary start and end date that create a unique service, product, or outcome.</p>
-              <p class="example">Audit responses and migrations.</p>
-            </section>
-          </div>
-        </aside>
       </main>
     </div>
 
@@ -154,8 +134,43 @@
             <option>Projects</option>
           </select>
         </label>
+        <details class="category-helper" id="taskCategoryGuide">
+          <summary>Time categories</summary>
+          <div class="category-guide-list">
+            <section>
+              <h3>Admin</h3>
+              <p>Vacation, sick time, holidays, professional development, email, and meetings not tied to a project.</p>
+            </section>
+            <section>
+              <h3>Operations</h3>
+              <p>Service requests, incidents, existing responsibilities, break/fix work, and delivery support.</p>
+            </section>
+            <section>
+              <h3>Projects</h3>
+              <p>Temporary work with a start and end date that creates a unique service, product, or outcome.</p>
+            </section>
+          </div>
+        </details>
         <div class="modal-actions">
           <button class="button button-secondary" type="button" data-action="close-task-dialog">Cancel</button>
+          <button class="button button-primary" type="submit">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="rowDialog">
+      <form id="rowForm" method="dialog">
+        <div class="modal-header">
+          <h2 id="rowDialogTitle">Add row</h2>
+          <button class="icon-button" value="cancel" type="button" data-action="close-row-dialog" aria-label="Close">Close</button>
+        </div>
+        <input id="rowIndexInput" type="hidden">
+        <label class="field">
+          <span>Row name</span>
+          <input id="rowNameInput" maxlength="80" required type="text">
+        </label>
+        <div class="modal-actions">
+          <button class="button button-secondary" type="button" data-action="close-row-dialog">Cancel</button>
           <button class="button button-primary" type="submit">Save</button>
         </div>
       </form>
