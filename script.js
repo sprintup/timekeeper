@@ -348,10 +348,16 @@ function render() {
     track.className = "task-track";
     track.dataset.rowIndex = String(rowIndex);
 
-    tasks.forEach((task) => {
+    const activeTasks = tasks.filter((task) => task.status !== "finished");
+    const completedTasks = tasks.filter((task) => task.status === "finished");
+
+    activeTasks.forEach((task) => {
       track.appendChild(createTaskCard(task));
     });
     track.appendChild(createSideQuestButton(rowIndex));
+    completedTasks.forEach((task) => {
+      track.appendChild(createTaskCard(task));
+    });
 
     row.append(label, track);
     elements.board.appendChild(row);
