@@ -124,11 +124,12 @@ button {
   border-radius: 8px;
   padding: 12px;
   background: #ffffff;
+  align-items: center;
 }
 
 .actions-panel .button {
-  flex: 1 1 150px;
-  min-width: 0;
+  flex: 0 0 auto;
+  min-width: max-content;
 }
 
 .github-page-link {
@@ -289,6 +290,7 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  white-space: nowrap;
 }
 
 .button {
@@ -296,6 +298,7 @@ button {
   align-items: center;
   justify-content: center;
   padding: 0 16px;
+  white-space: nowrap;
 }
 
 .button:hover,
@@ -403,8 +406,23 @@ summary:focus-visible {
   overflow-wrap: anywhere;
 }
 
-.row-edit-button {
+.row-label-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.row-edit-button,
+.row-delete-button {
   align-self: start;
+  padding: 0 10px;
+}
+
+.row-delete-button {
+  background: #fff1f1;
+  border-color: #a84d4d;
+  color: #7b2323;
 }
 
 .task-track {

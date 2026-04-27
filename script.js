@@ -41,6 +41,7 @@ function cacheElements() {
     Projects: document.getElementById("projectsTotalTime"),
   };
   elements.generateReportButton = document.getElementById("generateReportButton");
+  elements.clearCompletedButton = document.getElementById("clearCompletedButton");
   elements.resetStateButton = document.getElementById("resetStateButton");
 
   elements.taskDialog = document.getElementById("taskDialog");
@@ -80,6 +81,7 @@ function cacheElements() {
 
 function bindEvents() {
   elements.generateReportButton.addEventListener("click", openReportDialog);
+  elements.clearCompletedButton.addEventListener("click", clearCompletedTasksWithPrompt);
   elements.resetStateButton.addEventListener("click", resetStateWithPrompt);
   elements.timeGoalForm.addEventListener("submit", saveTimeGoalFromForm);
   elements.clearTimeGoalButton.addEventListener("click", clearTimeGoal);
@@ -140,6 +142,11 @@ function handleDocumentClick(event) {
 
   if (action === "edit-row") {
     openRowDialog("edit", Number(actionElement.dataset.rowIndex));
+    return;
+  }
+
+  if (action === "delete-row") {
+    deleteRowWithPrompt(Number(actionElement.dataset.rowIndex));
     return;
   }
 
@@ -339,7 +346,10 @@ function render() {
       <span class="drag-handle row-drag-handle" aria-label="Drag row" role="img" title="Drag row">::::</span>
       <strong></strong>
       <span>${rowIndex === 0 ? "Highest" : "Lower"}</span>
-      <button class="icon-button row-edit-button" data-action="edit-row" data-row-index="${rowIndex}" type="button">Rename</button>
+      <div class="row-label-actions">
+        <button class="icon-button row-edit-button" data-action="edit-row" data-row-index="${rowIndex}" type="button">Rename</button>
+        <button class="icon-button row-delete-button" data-action="delete-row" data-row-index="${rowIndex}" type="button">Delete</button>
+      </div>
     `;
     label.querySelector("strong").textContent = getRowName(rowIndex);
     label.querySelector(".row-drag-handle").addEventListener("pointerdown", handleRowPointerDown);
@@ -715,6 +725,48 @@ function saveRowFromDialog(event) {
   render();
 }
 
+function deleteRowWithPrompt(rowIndex) {
+  if (!Number.isInteger(rowIndex) || !state.rows[rowIndex]) {
+    return;
+  }
+
+  const rowName = getRowName(rowIndex);
+  const rowTasks = state.tasks.filter((task) => task.row === rowIndex);
+  const taskCount = rowTasks.length;
+  const taskText = taskCount === 0
+    ? ""
+    : ` This will also delete ${taskCount} task box${taskCount === 1 ? "" : "es"} and ${taskCount === 1 ? "its" : "their"} time logs.`;
+  const confirmed = window.confirm(`Delete "${rowName}"?${taskText}`);
+  if (!confirmed) {
+    return;
+  }
+
+  deleteRow(rowIndex);
+}
+
+function deleteRow(rowIndex) {
+  const deletedTaskIds = new Set(state.tasks.filter((task) => task.row === rowIndex).map((task) => task.id));
+  state.tasks = state.tasks
+    .filter((task) => task.row !== rowIndex)
+    .map((task) => {
+      if (task.row > rowIndex) {
+        task.row -= 1;
+      }
+      return task;
+    });
+  state.rows.splice(rowIndex, 1);
+  normalizeBoard();
+  saveState();
+
+  if (activeTimeLogTaskId && deletedTaskIds.has(activeTimeLogTaskId)) {
+    activeTimeLogTaskId = null;
+    closeDialog(elements.timeLogDialog);
+    closeDialog(elements.logDialog);
+  }
+
+  render();
+}
+
 function createRow(name) {
   return {
     id: createId(),
@@ -1057,6 +1109,31 @@ function deleteTimeLogs() {
   saveState();
   if (activeTimeLogTaskId) {
     renderTimeLogModal();
+  }
+  render();
+}
+
+function clearCompletedTasksWithPrompt() {
+  const completedCount = state.tasks.filter((task) => task.status === "finished").length;
+  if (completedCount === 0) {
+    return;
+  }
+
+  const confirmed = window.confirm(`Clear ${completedCount} completed task${completedCount === 1 ? "" : "s"}?`);
+  if (!confirmed) {
+    return;
+  }
+
+  clearCompletedTasks();
+}
+
+function clearCompletedTasks() {
+  state.tasks = state.tasks.filter((task) => task.status !== "finished");
+  normalizeBoard();
+  saveState();
+  if (activeTimeLogTaskId && !findTask(activeTimeLogTaskId)) {
+    activeTimeLogTaskId = null;
+    closeDialog(elements.timeLogDialog);
   }
   render();
 }
