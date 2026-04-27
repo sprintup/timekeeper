@@ -452,6 +452,15 @@ summary:focus-visible {
   margin-left: 106px;
 }
 
+.add-task-footer.is-empty-board {
+  margin-left: 0;
+  min-height: 214px;
+  display: flex;
+  align-items: center;
+  padding-left: 106px;
+  border-bottom: 1px dashed var(--line);
+}
+
 .add-task-tile {
   min-width: 190px;
   min-height: 72px;
@@ -634,5 +643,10 @@ summary:focus-visible {
 
   .add-task-footer {
     margin-left: 0;
+  }
+
+  .add-task-footer.is-empty-board {
+    min-height: 140px;
+    padding-left: 0;
   }
 }

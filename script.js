@@ -250,7 +250,7 @@ function render() {
     elements.board.appendChild(row);
   });
 
-  elements.board.appendChild(createAddTaskFooter());
+  elements.board.appendChild(createAddTaskFooter(rows.length === 0));
   tick();
 }
 
@@ -279,9 +279,10 @@ function createSideQuestButton(rowIndex) {
   return button;
 }
 
-function createAddTaskFooter() {
+function createAddTaskFooter(isEmptyBoard = false) {
   const footer = document.createElement("div");
   footer.className = "add-task-footer";
+  footer.classList.toggle("is-empty-board", isEmptyBoard);
 
   const button = document.createElement("button");
   button.className = "add-task-tile";
