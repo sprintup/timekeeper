@@ -473,6 +473,7 @@ function sanitizeTask(task) {
   const bucket = sanitizeBucket(task.bucket);
   const logs = Array.isArray(task.logs) ? task.logs.map(sanitizeLog).filter(Boolean) : [];
   const finishNotes = sanitizeFinishNotes(task.finishNotes, task.finishNote, task.finishedAt);
+  const wasUrgent = task.wasUrgent === true || task.urgent === true;
 
   return {
     id: String(task.id || createId()),
@@ -484,6 +485,7 @@ function sanitizeTask(task) {
     createdAt: task.createdAt || new Date().toISOString(),
     finishedAt: task.finishedAt || null,
     urgent: status === "finished" ? false : task.urgent === true,
+    wasUrgent,
     finishNotes,
     logs,
   };
@@ -1223,6 +1225,7 @@ function createTask({ objective, bucket, placement, rowIndex }) {
     createdAt: new Date().toISOString(),
     finishedAt: null,
     urgent: false,
+    wasUrgent: false,
     finishNotes: [],
     logs: [],
   };
@@ -1547,6 +1550,9 @@ function toggleUrgent(taskId) {
   }
 
   task.urgent = !task.urgent;
+  if (task.urgent) {
+    task.wasUrgent = true;
+  }
   normalizeBoard();
   saveState();
   render();
@@ -1937,7 +1943,7 @@ function renderReportPreview() {
         entry.objectives.forEach((objective) => {
           const objectiveItem = document.createElement("li");
           const objectiveSummary = document.createElement("span");
-          objectiveSummary.textContent = `${objective.objective} (${objective.bucket}) - ${formatDuration(objective.durationMs)}`;
+          objectiveSummary.textContent = `${objective.objective}${formatUrgentReportLabel(objective)} (${objective.bucket}) - ${formatDuration(objective.durationMs)}`;
           objectiveItem.appendChild(objectiveSummary);
 
           if (objective.notes.length > 0) {
@@ -2046,6 +2052,7 @@ function buildReport() {
         objective: task.objective,
         bucket: task.bucket,
         durationMs,
+        wasUrgent: wasTaskEverUrgent(task),
         notes: getTaskReportNotes(task),
         logs: logEntries,
       });
@@ -2098,7 +2105,7 @@ function buildReportText(report = buildReport()) {
     report.goals.forEach((goal) => {
       lines.push(`${goal.label} - ${formatDuration(goal.durationMs)}`);
       goal.objectives.forEach((objective) => {
-        lines.push(`  ${objective.objective} (${objective.bucket}) - ${formatDuration(objective.durationMs)}`);
+        lines.push(`  ${objective.objective}${formatUrgentReportLabel(objective)} (${objective.bucket}) - ${formatDuration(objective.durationMs)}`);
         objective.notes.forEach((note) => {
           lines.push(`    ${note}`);
         });
@@ -2245,6 +2252,7 @@ function createReportLogEntry(log, task, reportStart, reportEnd) {
     durationMs,
     objective: task.objective,
     bucket: task.bucket,
+    wasUrgent: wasTaskEverUrgent(task),
     start: logWindow.start,
     end: logWindow.end,
     sortTime: logWindow.sortTime,
@@ -2263,6 +2271,14 @@ function getTaskReportNotes(task) {
   }
 
   return task.status === "finished" || task.finishedAt ? ["finished"] : [];
+}
+
+function wasTaskEverUrgent(task) {
+  return task.wasUrgent === true || task.urgent === true;
+}
+
+function formatUrgentReportLabel(entry) {
+  return entry.wasUrgent ? " [Marked urgent]" : "";
 }
 
 function getLogDurationWithinRange(log, reportStart, reportEnd) {
@@ -2321,7 +2337,7 @@ function formatTimelineEntry(entry) {
     ? `${formatDateTime(entry.start)} - ${entry.end ? formatDateTime(entry.end) : "Running"}`
     : entry.label.replace(/\s+\(.+\)$/, "");
   const notes = entry.notes.length > 0 ? ` | ${entry.notes.join("; ")}` : "";
-  return `${timeRange} (${formatDuration(entry.durationMs)}) | ${entry.objective} | ${entry.bucket}${notes}`;
+  return `${timeRange} (${formatDuration(entry.durationMs)}) | ${entry.objective}${formatUrgentReportLabel(entry)} | ${entry.bucket}${notes}`;
 }
 
 function tick() {
