@@ -32,15 +32,15 @@
             </div>
           </form>
           <dl class="totals-grid" id="todayTotals">
-            <div>
+            <div data-bucket="Admin">
               <dt>Admin</dt>
               <dd id="adminTotalTime">0h 00m 00s</dd>
             </div>
-            <div>
+            <div data-bucket="Operations">
               <dt>Operations</dt>
               <dd id="operationsTotalTime">0h 00m 00s</dd>
             </div>
-            <div>
+            <div data-bucket="Projects">
               <dt>Projects</dt>
               <dd id="projectsTotalTime">0h 00m 00s</dd>
             </div>
@@ -85,7 +85,7 @@
     <template id="taskCardTemplate">
       <article class="task-card">
         <div class="task-card-header">
-          <span class="drag-handle task-drag-handle" aria-label="Drag task" role="img" title="Drag task">::::</span>
+          <button class="drag-handle task-drag-handle" aria-label="Drag task" title="Drag task" type="button"></button>
           <select class="bucket-select" aria-label="Bucket">
             <option>Admin</option>
             <option>Operations</option>

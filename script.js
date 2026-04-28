@@ -214,7 +214,8 @@ function handleDocumentChange(event) {
     return;
   }
 
-  const taskId = event.target.closest("[data-task-id]")?.dataset.taskId;
+  const taskCard = event.target.closest("[data-task-id]");
+  const taskId = taskCard?.dataset.taskId;
   const task = findTask(taskId);
   if (!task || !BUCKETS.includes(event.target.value)) {
     return;
@@ -346,15 +347,20 @@ function render() {
     const label = document.createElement("div");
     label.className = "row-label";
     label.innerHTML = `
-      <span class="drag-handle row-drag-handle" aria-label="Drag row" role="img" title="Drag row">::::</span>
+      <span class="row-priority-label">Priority ${rowIndex + 1}</span>
+      <button class="drag-handle row-drag-handle" aria-label="Drag row" title="Drag row" type="button"></button>
       <strong></strong>
-      <span>${rowIndex === 0 ? "Highest" : "Lower"}</span>
+      <div class="row-subtotal">
+        <span>Subtotal</span>
+        <strong data-row-subtotal-index="${rowIndex}"></strong>
+      </div>
       <div class="row-label-actions">
         <button class="icon-button row-edit-button" data-action="edit-row" data-row-index="${rowIndex}" type="button">Rename</button>
         <button class="icon-button row-delete-button" data-action="delete-row" data-row-index="${rowIndex}" type="button">Delete</button>
       </div>
     `;
     label.querySelector("strong").textContent = getRowName(rowIndex);
+    label.querySelector("[data-row-subtotal-index]").textContent = formatDuration(getRowElapsed(rowIndex));
     label.querySelector(".row-drag-handle").addEventListener("pointerdown", handleRowPointerDown);
 
     const track = document.createElement("div");
@@ -1476,6 +1482,13 @@ function getTaskElapsed(task) {
   return task.logs.reduce((total, log) => total + getLogDuration(log, now), 0);
 }
 
+function getRowElapsed(rowIndex) {
+  const now = new Date();
+  return state.tasks
+    .filter((task) => task.row === rowIndex)
+    .reduce((total, task) => total + task.logs.reduce((taskTotal, log) => taskTotal + getLogDuration(log, now), 0), 0);
+}
+
 function getLogDuration(log, now = new Date()) {
   if (log.manual) {
     return log.durationMs;
@@ -1586,6 +1599,12 @@ function tick() {
     const task = findTask(element.dataset.elapsedTaskId);
     if (task) {
       element.textContent = formatDuration(getTaskElapsed(task));
+    }
+  });
+  document.querySelectorAll("[data-row-subtotal-index]").forEach((element) => {
+    const rowIndex = Number(element.dataset.rowSubtotalIndex);
+    if (Number.isInteger(rowIndex)) {
+      element.textContent = formatDuration(getRowElapsed(rowIndex));
     }
   });
 

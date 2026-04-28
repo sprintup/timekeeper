@@ -14,6 +14,12 @@
   --red: #a83d32;
   --red-soft: #f6e5e2;
   --yellow: #f4e4ad;
+  --bucket-admin: #eee8ff;
+  --bucket-admin-line: #8e78d7;
+  --bucket-operations: #dceeff;
+  --bucket-operations-line: #5b93c8;
+  --bucket-projects: #ffebc2;
+  --bucket-projects-line: #c99025;
   --shadow: 0 14px 32px rgba(31, 37, 40, 0.12);
 }
 
@@ -258,6 +264,21 @@ button {
   background: #fbfbf8;
 }
 
+.totals-grid [data-bucket="Admin"] {
+  border-color: var(--bucket-admin-line);
+  background: var(--bucket-admin);
+}
+
+.totals-grid [data-bucket="Operations"] {
+  border-color: var(--bucket-operations-line);
+  background: var(--bucket-operations);
+}
+
+.totals-grid [data-bucket="Projects"] {
+  border-color: var(--bucket-projects-line);
+  background: var(--bucket-projects);
+}
+
 .totals-grid dt {
   color: var(--muted);
   font-size: 0.78rem;
@@ -307,6 +328,7 @@ button {
 
 .button:focus-visible,
 .icon-button:focus-visible,
+.drag-handle:focus-visible,
 .side-quest-tile:focus-visible,
 .add-task-tile:focus-visible,
 input:focus-visible,
@@ -386,21 +408,53 @@ summary:focus-visible {
   grid-template-columns: 150px minmax(0, 1fr);
   gap: 14px;
   align-items: stretch;
+  border: 2px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 12px;
+  background: #ffffff;
+  box-shadow: 0 4px 0 rgba(31, 37, 40, 0.05);
 }
 
 .row-label {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 8px;
   min-height: 214px;
   color: var(--muted);
   font-weight: 700;
 }
 
+.row-priority-label {
+  color: var(--blue-dark);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .row-label strong {
   color: var(--ink);
   overflow-wrap: anywhere;
+}
+
+.row-subtotal {
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 8px;
+  background: #fbfbf8;
+}
+
+.row-subtotal span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.row-subtotal strong {
+  font-size: 0.9rem;
 }
 
 .row-label-actions {
@@ -428,16 +482,15 @@ summary:focus-visible {
   gap: 14px;
   min-height: 214px;
   overflow-x: auto;
-  padding: 4px 4px 12px;
-  border-bottom: 1px dashed var(--line);
+  padding: 2px 2px 10px;
 }
 
 .task-row.is-row-dragging {
   opacity: 0.56;
 }
 
-.task-row.is-row-drop-target .task-track {
-  border-bottom-color: var(--blue);
+.task-row.is-row-drop-target {
+  border-color: var(--blue);
   background: rgba(31, 92, 138, 0.05);
 }
 
@@ -450,19 +503,33 @@ summary:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: 2px solid var(--line-strong);
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
   border-radius: 6px;
+  padding: 0;
   background: #ffffff;
-  color: var(--muted);
+  box-shadow: 0 2px 0 rgba(31, 37, 40, 0.06);
   cursor: grab;
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-  font-size: 0.78rem;
-  font-weight: 900;
-  line-height: 1;
   touch-action: none;
   user-select: none;
+}
+
+.drag-handle::before {
+  width: 16px;
+  height: 20px;
+  content: "";
+  background-image: radial-gradient(circle, var(--muted) 1.7px, transparent 1.8px);
+  background-position: 0 0;
+  background-size: 7px 7px;
+  opacity: 0.9;
+}
+
+.drag-handle:hover,
+.drag-handle:focus-visible {
+  border-color: var(--blue);
+  background: #f3f8fb;
 }
 
 .drag-handle:active {
@@ -493,6 +560,7 @@ body.is-board-dragging * {
 .task-card.is-running {
   border-color: var(--green-line);
   background: var(--green);
+  box-shadow: 0 0 0 4px rgba(107, 176, 106, 0.18), 0 4px 0 rgba(31, 37, 40, 0.06);
 }
 
 .task-card.is-finished {
@@ -532,15 +600,18 @@ body.is-board-dragging * {
 }
 
 .bucket-select[data-bucket="Admin"] {
-  background: #eef0f2;
+  border-color: var(--bucket-admin-line);
+  background: var(--bucket-admin);
 }
 
 .bucket-select[data-bucket="Operations"] {
-  background: #e7f2f1;
+  border-color: var(--bucket-operations-line);
+  background: var(--bucket-operations);
 }
 
 .bucket-select[data-bucket="Projects"] {
-  background: #f7edc5;
+  border-color: var(--bucket-projects-line);
+  background: var(--bucket-projects);
 }
 
 .task-objective {
@@ -826,6 +897,11 @@ body.is-board-dragging * {
     width: min(100% - 20px, 1500px);
   }
 
+  .top-control-panel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .app-header,
   .board-toolbar,
   .axis-labels {
@@ -845,15 +921,17 @@ body.is-board-dragging * {
 
   .actions-panel {
     display: flex;
-    flex: 1 1 auto;
+    flex: 0 1 100%;
     flex-wrap: wrap;
     overflow-x: visible;
     width: 100%;
+    max-width: 100%;
   }
 
   .instructions-panel {
-    flex: 1 1 auto;
+    flex: 0 1 100%;
     width: 100%;
+    max-width: 100%;
   }
 
   .actions-panel .button {
@@ -868,9 +946,14 @@ body.is-board-dragging * {
 
   .row-label {
     min-height: auto;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+
+  .row-label-actions {
     flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
+    flex-wrap: wrap;
   }
 
   .task-card {
