@@ -25,6 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
   bindEvents();
   render();
   updateDate();
+  updateScrollTopButton();
   window.setInterval(tick, 1000);
 });
 
@@ -55,6 +56,7 @@ function cacheElements() {
   elements.importDataButton = document.getElementById("importDataButton");
   elements.importDataInput = document.getElementById("importDataInput");
   elements.resetStateButton = document.getElementById("resetStateButton");
+  elements.scrollTopButton = document.getElementById("scrollTopButton");
 
   elements.taskDialog = document.getElementById("taskDialog");
   elements.taskForm = document.getElementById("taskForm");
@@ -124,6 +126,7 @@ function bindEvents() {
   elements.finishNoteForm.addEventListener("submit", saveFinishNoteFromDialog);
   elements.reportForm.addEventListener("submit", downloadReportFromDialog);
   elements.emailReportButton.addEventListener("click", emailReportFromDialog);
+  elements.scrollTopButton.addEventListener("click", scrollToTop);
 
   document.addEventListener("click", handleDocumentClick);
   document.addEventListener("change", handleDocumentChange);
@@ -131,6 +134,8 @@ function bindEvents() {
   document.addEventListener("pointerup", handleBoardPointerUp);
   document.addEventListener("pointercancel", cancelActiveDrag);
   document.addEventListener("pointerdown", primeChimeAudioForSavedGoal, { once: true });
+  window.addEventListener("scroll", updateScrollTopButton, { passive: true });
+  window.addEventListener("resize", updateScrollTopButton);
 }
 
 function handleDocumentClick(event) {
@@ -2441,37 +2446,45 @@ function scrollToRow(rowIndex) {
     return;
   }
 
-  const stickyOffset = getStickyHeaderOffset();
+  const stickyOffset = getStickyGoalPanelOffset();
   const targetTop = row.getBoundingClientRect().top + window.scrollY - stickyOffset;
   window.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
 
   window.setTimeout(() => {
-    keepRowBelowStickyHeader(row);
+    keepRowBelowStickyGoalPanel(row);
   }, 350);
 }
 
-function getStickyHeaderOffset() {
-  const stickyHeader = document.querySelector(".app-header");
-  if (!stickyHeader) {
+function getStickyGoalPanelOffset() {
+  const stickyPanel = document.querySelector(".goal-sticky-panel");
+  if (!stickyPanel) {
     return 24;
   }
 
-  const headerStyles = window.getComputedStyle(stickyHeader);
-  const stickyTop = Number.parseFloat(headerStyles.top) || 0;
-  const headerHeight = stickyHeader.getBoundingClientRect().height;
-  return stickyTop + headerHeight + 16;
+  const panelStyles = window.getComputedStyle(stickyPanel);
+  const stickyTop = Number.parseFloat(panelStyles.top) || 0;
+  const panelHeight = stickyPanel.getBoundingClientRect().height;
+  return stickyTop + panelHeight + 16;
 }
 
-function keepRowBelowStickyHeader(row) {
+function keepRowBelowStickyGoalPanel(row) {
   if (!row.isConnected) {
     return;
   }
 
-  const desiredTop = getStickyHeaderOffset();
+  const desiredTop = getStickyGoalPanelOffset();
   const overlap = desiredTop - row.getBoundingClientRect().top;
   if (overlap > 1) {
     window.scrollBy({ top: -overlap, behavior: "smooth" });
   }
+}
+
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function updateScrollTopButton() {
+  elements.scrollTopButton.hidden = window.scrollY <= 0;
 }
 
 function getTodayTotalMs() {

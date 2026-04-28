@@ -82,15 +82,17 @@
               <dd id="personalTotalTime">0h 00m 00s</dd>
             </div>
           </dl>
-          <section class="goal-breakdown" aria-label="Goal totals">
-            <div class="goal-totals" id="goalTotals"></div>
-          </section>
-          <div class="urgent-indicator" id="urgentIndicator" hidden>
-            <span class="urgent-flag" aria-hidden="true"></span>
-            <span id="urgentIndicatorText">Urgent tasks</span>
-          </div>
         </section>
       </header>
+      <section class="goal-sticky-panel" aria-label="Goal totals">
+        <div class="goal-breakdown">
+          <div class="goal-totals" id="goalTotals"></div>
+        </div>
+        <div class="urgent-indicator" id="urgentIndicator" hidden>
+          <span class="urgent-flag" aria-hidden="true"></span>
+          <span id="urgentIndicatorText">Urgent tasks</span>
+        </div>
+      </section>
       <div class="top-divider" aria-hidden="true"></div>
 
       <main class="workspace">
@@ -234,7 +236,6 @@
             <p class="eyebrow">Notes</p>
             <h2 id="finishNoteDialogTitle">Notes</h2>
           </div>
-          <button class="icon-button" value="cancel" type="button" data-action="close-finish-note-dialog" aria-label="Close">Close</button>
         </div>
         <div class="time-log-list notes-list" id="finishNoteList"></div>
         <form class="finish-note-form" id="finishNoteForm" method="dialog">
@@ -246,12 +247,10 @@
           </label>
           <div class="modal-actions">
             <button class="button button-secondary" type="button" data-action="clear-finish-note-form">New note</button>
+            <button class="button button-secondary" type="button" data-action="close-finish-note-dialog">Close</button>
             <button class="button button-primary" id="finishNoteSubmitButton" type="submit">Add note</button>
           </div>
         </form>
-        <div class="modal-actions">
-          <button class="button button-secondary" type="button" data-action="close-finish-note-dialog">Close</button>
-        </div>
       </div>
     </dialog>
 
@@ -304,6 +303,7 @@
         </div>
       </form>
     </dialog>
+    <button class="button button-secondary scroll-top-button" id="scrollTopButton" type="button" aria-label="Scroll to top" hidden>Top</button>
 
     <script src="script.js"></script>
   </body>

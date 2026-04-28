@@ -61,9 +61,6 @@ button {
 }
 
 .app-header {
-  position: sticky;
-  top: 8px;
-  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -309,6 +306,19 @@ button {
   gap: 8px;
 }
 
+.goal-sticky-panel {
+  position: sticky;
+  top: 8px;
+  z-index: 20;
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  border: 2px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 12px;
+  background: #ffffff;
+}
+
 .urgent-indicator {
   display: inline-flex;
   align-items: center;
@@ -358,6 +368,20 @@ button {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 8px;
+}
+
+.scroll-top-button {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 30;
+  min-width: 72px;
+  min-height: 42px;
+  box-shadow: var(--shadow);
+}
+
+.scroll-top-button[hidden] {
+  display: none;
 }
 
 .goal-total-item,
