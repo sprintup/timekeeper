@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Timekeeper</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
@@ -54,9 +55,9 @@
           <div class="instructions-content">
             <ol>
               <li>Set a time goal, then use the remaining-time countdown to track progress against the day.</li>
-              <li>Add named rows for groups of work, then use Add Task Box inside each row. Rename or delete rows from the row label.</li>
+              <li>Add named goals for groups of work, then use Add task inside each goal. Rename or delete goals from the goal label.</li>
               <li>Start one task at a time. Starting another task pauses the active timer and promotes the new task to the top-left priority position.</li>
-              <li>Use the drag handles to rearrange rows vertically or task boxes within and across rows.</li>
+              <li>Use the drag handles to rearrange goals vertically or task boxes within and across goals.</li>
               <li>Open Show time log to add, edit, or delete entries. Generate a report for bucket totals, objective totals, and the chronological timeline.</li>
             </ol>
           </div>
@@ -121,7 +122,7 @@
     <dialog class="modal" id="taskDialog">
       <form id="taskForm" method="dialog">
         <div class="modal-header">
-          <h2 id="taskDialogTitle">Add task box</h2>
+          <h2 id="taskDialogTitle">Add task</h2>
           <button class="icon-button" value="cancel" type="button" data-action="close-task-dialog" aria-label="Close">Close</button>
         </div>
         <input id="taskIdInput" type="hidden">
@@ -158,7 +159,8 @@
         </details>
         <div class="modal-actions">
           <button class="button button-secondary" type="button" data-action="close-task-dialog">Cancel</button>
-          <button class="button button-primary" type="submit">Save</button>
+          <button class="button button-secondary" type="submit" value="save">Save</button>
+          <button class="button button-primary" type="submit" value="save-start">Save and start</button>
         </div>
       </form>
     </dialog>
@@ -166,12 +168,12 @@
     <dialog class="modal" id="rowDialog">
       <form id="rowForm" method="dialog">
         <div class="modal-header">
-          <h2 id="rowDialogTitle">Add row</h2>
+          <h2 id="rowDialogTitle">Add goal</h2>
           <button class="icon-button" value="cancel" type="button" data-action="close-row-dialog" aria-label="Close">Close</button>
         </div>
         <input id="rowIndexInput" type="hidden">
         <label class="field">
-          <span>Row name</span>
+          <span>Goal name</span>
           <input id="rowNameInput" maxlength="80" required type="text">
         </label>
         <div class="modal-actions">

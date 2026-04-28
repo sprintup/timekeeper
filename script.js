@@ -313,9 +313,12 @@ function sanitizeRow(row, index) {
     return null;
   }
 
+  const name = String(row.name || `Goal ${index + 1}`);
+  const defaultRowMatch = name.match(/^Row (\d+)$/);
+
   return {
     id: String(row.id || createId()),
-    name: String(row.name || `Row ${index + 1}`).slice(0, 80),
+    name: (defaultRowMatch ? `Goal ${defaultRowMatch[1]}` : name).slice(0, 80),
   };
 }
 
@@ -348,7 +351,7 @@ function render() {
     label.className = "row-label";
     label.innerHTML = `
       <span class="row-priority-label">Priority ${rowIndex + 1}</span>
-      <button class="drag-handle row-drag-handle" aria-label="Drag row" title="Drag row" type="button"></button>
+      <button class="drag-handle row-drag-handle" aria-label="Drag goal" title="Drag goal" type="button"></button>
       <strong></strong>
       <div class="row-subtotal">
         <span>Subtotal</span>
@@ -402,7 +405,7 @@ function getRows() {
 }
 
 function getRowName(rowIndex) {
-  return state.rows[rowIndex]?.name || `Row ${rowIndex + 1}`;
+  return state.rows[rowIndex]?.name || `Goal ${rowIndex + 1}`;
 }
 
 function createSideQuestButton(rowIndex) {
@@ -411,7 +414,7 @@ function createSideQuestButton(rowIndex) {
   button.dataset.action = "add-side-quest";
   button.dataset.rowIndex = String(rowIndex);
   button.type = "button";
-  button.textContent = "Add Task Box";
+  button.textContent = "Add task";
   return button;
 }
 
@@ -424,7 +427,7 @@ function createAddTaskFooter(isEmptyBoard = false) {
   button.className = "add-task-tile";
   button.dataset.action = "add-row";
   button.type = "button";
-  button.textContent = "Add Row";
+  button.textContent = "Add Goal";
 
   footer.appendChild(button);
   return footer;
@@ -664,7 +667,7 @@ function moveRow(fromIndex, toIndex) {
   }
 
   rows.splice(toIndex, 0, movedRow);
-  state.rows.splice(toIndex, 0, movedRowMeta || createRow(`Row ${toIndex + 1}`));
+  state.rows.splice(toIndex, 0, movedRowMeta || createRow(`Goal ${toIndex + 1}`));
   rows.forEach((row, rowIndex) => {
     row.forEach((task, orderIndex) => {
       task.row = rowIndex;
@@ -707,7 +710,7 @@ function syncOrderFromDom() {
 
 function openRowDialog(mode, rowIndex = "") {
   const row = Number.isFinite(rowIndex) ? state.rows[rowIndex] : null;
-  elements.rowDialogTitle.textContent = mode === "edit" ? "Rename row" : "Add row";
+  elements.rowDialogTitle.textContent = mode === "edit" ? "Rename goal" : "Add goal";
   elements.rowIndexInput.value = Number.isFinite(rowIndex) ? String(rowIndex) : "";
   elements.rowNameInput.value = row?.name || "";
   openDialog(elements.rowDialog);
@@ -745,7 +748,7 @@ function deleteRowWithPrompt(rowIndex) {
   const taskText = taskCount === 0
     ? ""
     : ` This will also delete ${taskCount} task box${taskCount === 1 ? "" : "es"} and ${taskCount === 1 ? "its" : "their"} time logs.`;
-  const confirmed = window.confirm(`Delete "${rowName}"?${taskText}`);
+  const confirmed = window.confirm(`Delete goal "${rowName}"?${taskText}`);
   if (!confirmed) {
     return;
   }
@@ -779,12 +782,12 @@ function deleteRow(rowIndex) {
 function createRow(name) {
   return {
     id: createId(),
-    name: String(name || "New Row").slice(0, 80),
+    name: String(name || "New Goal").slice(0, 80),
   };
 }
 
 function openTaskDialog(mode, placement, task = null, rowIndex = "") {
-  elements.taskDialogTitle.textContent = mode === "edit" ? "Edit task box" : placement === "side" ? "Add side quest" : "Add task box";
+  elements.taskDialogTitle.textContent = mode === "edit" ? "Edit task" : "Add task";
   elements.taskIdInput.value = task?.id || "";
   elements.taskPlacementInput.value = placement;
   elements.taskRowInput.value = task ? String(task.row) : rowIndex === "" ? "" : String(rowIndex);
@@ -804,6 +807,8 @@ function saveTaskFromDialog(event) {
   const rowIndex = elements.taskRowInput.value === "" ? null : Number(elements.taskRowInput.value);
   const objective = elements.objectiveInput.value.trim();
   const bucket = elements.bucketInput.value;
+  const shouldStart = event.submitter?.value === "save-start";
+  let savedTask = null;
 
   if (!objective || !BUCKETS.includes(bucket)) {
     return;
@@ -814,9 +819,15 @@ function saveTaskFromDialog(event) {
     if (task) {
       task.objective = objective;
       task.bucket = bucket;
+      savedTask = task;
     }
   } else {
-    state.tasks.push(createTask({ objective, bucket, placement, rowIndex }));
+    savedTask = createTask({ objective, bucket, placement, rowIndex });
+    state.tasks.push(savedTask);
+  }
+
+  if (shouldStart && savedTask && !isTaskRunning(savedTask)) {
+    startTask(savedTask);
   }
 
   normalizeBoard();
@@ -1273,21 +1284,6 @@ function renderReportPreview() {
     totals.append(term, detail);
   });
 
-  const timelineHeading = document.createElement("h4");
-  timelineHeading.textContent = "Timeline";
-  const timelineList = document.createElement("ul");
-  if (report.timeline.length === 0) {
-    const item = document.createElement("li");
-    item.textContent = "No time logged.";
-    timelineList.appendChild(item);
-  } else {
-    report.timeline.forEach((entry) => {
-      const item = document.createElement("li");
-      item.textContent = formatTimelineEntry(entry);
-      timelineList.appendChild(item);
-    });
-  }
-
   const objectiveHeading = document.createElement("h4");
   objectiveHeading.textContent = "Objectives";
   const objectiveList = document.createElement("ul");
@@ -1303,7 +1299,22 @@ function renderReportPreview() {
     });
   }
 
-  elements.reportPreview.append(heading, summaryHeading, totals, timelineHeading, timelineList, objectiveHeading, objectiveList);
+  const timelineHeading = document.createElement("h4");
+  timelineHeading.textContent = "Timeline";
+  const timelineList = document.createElement("ul");
+  if (report.timeline.length === 0) {
+    const item = document.createElement("li");
+    item.textContent = "No time logged.";
+    timelineList.appendChild(item);
+  } else {
+    report.timeline.forEach((entry) => {
+      const item = document.createElement("li");
+      item.textContent = formatTimelineEntry(entry);
+      timelineList.appendChild(item);
+    });
+  }
+
+  elements.reportPreview.append(heading, summaryHeading, totals, objectiveHeading, objectiveList, timelineHeading, timelineList);
 }
 
 function downloadReportFromDialog(event) {
@@ -1387,16 +1398,6 @@ function buildReportText() {
     lines.push(`${bucket} - ${formatDuration(report.totals[bucket])}`);
   });
 
-  lines.push("", "Timeline");
-
-  if (report.timeline.length === 0) {
-    lines.push("No time logged.");
-  } else {
-    report.timeline.forEach((entry) => {
-      lines.push(formatTimelineEntry(entry));
-    });
-  }
-
   lines.push("", "Objectives");
 
   if (report.objectives.length === 0) {
@@ -1407,6 +1408,16 @@ function buildReportText() {
       entry.logs.forEach((log) => {
         lines.push(`  ${log.label}`);
       });
+    });
+  }
+
+  lines.push("", "Timeline");
+
+  if (report.timeline.length === 0) {
+    lines.push("No time logged.");
+  } else {
+    report.timeline.forEach((entry) => {
+      lines.push(formatTimelineEntry(entry));
     });
   }
 
@@ -1432,13 +1443,13 @@ function normalizeBoard() {
 function ensureRowsForTasks() {
   const maxTaskRow = state.tasks.reduce((max, task) => Math.max(max, task.row), -1);
   for (let rowIndex = state.rows.length; rowIndex <= maxTaskRow; rowIndex += 1) {
-    state.rows.push(createRow(`Row ${rowIndex + 1}`));
+    state.rows.push(createRow(`Goal ${rowIndex + 1}`));
   }
 }
 
 function ensureRowIndex(rowIndex) {
   for (let index = state.rows.length; index <= rowIndex; index += 1) {
-    state.rows.push(createRow(`Row ${index + 1}`));
+    state.rows.push(createRow(`Goal ${index + 1}`));
   }
 }
 
