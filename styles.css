@@ -115,6 +115,16 @@ button {
   flex-wrap: wrap;
 }
 
+.copy-report-status {
+  color: var(--green-line);
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.copy-report-status[hidden] {
+  display: none;
+}
+
 .top-control-panel {
   display: flex;
   flex-wrap: wrap;

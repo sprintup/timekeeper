@@ -103,6 +103,7 @@ function cacheElements() {
   elements.reportEmailInput = document.getElementById("reportEmailInput");
   elements.emailReportButton = document.getElementById("emailReportButton");
   elements.copyReportButton = document.getElementById("copyReportButton");
+  elements.copyReportStatus = document.getElementById("copyReportStatus");
   elements.deleteAfterReportInput = document.getElementById("deleteAfterReportInput");
 }
 
@@ -1907,6 +1908,7 @@ function openReportDialog() {
   renderReportPreview();
   elements.reportEmailInput.value = "";
   elements.deleteAfterReportInput.checked = true;
+  setCopyReportStatus("");
   openDialog(elements.reportDialog);
 }
 
@@ -2037,19 +2039,39 @@ function emailReportFromDialog() {
 
 async function copyReportFromDialog() {
   const reportText = buildReportText(buildReport());
+  const originalText = elements.copyReportButton.textContent;
+  elements.copyReportButton.textContent = "Copying";
+  elements.copyReportButton.disabled = true;
+  setCopyReportStatus("");
 
   try {
     await copyTextToClipboard(reportText);
-    showTemporaryButtonText(elements.copyReportButton, "Copied");
+    elements.copyReportButton.textContent = "Copied";
+    setCopyReportStatus("Copied to clipboard.");
   } catch (error) {
-    window.alert("Unable to copy the report to the clipboard.");
+    elements.copyReportButton.textContent = "Copy failed";
+    setCopyReportStatus("Copy failed.");
   }
+
+  window.setTimeout(() => {
+    if (!elements.copyReportButton.isConnected) {
+      return;
+    }
+
+    elements.copyReportButton.textContent = originalText;
+    elements.copyReportButton.disabled = false;
+    setCopyReportStatus("");
+  }, 1800);
 }
 
 async function copyTextToClipboard(text) {
   if (navigator.clipboard?.writeText && window.isSecureContext) {
-    await navigator.clipboard.writeText(text);
-    return;
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch (error) {
+      // Fall back to the selection-based path below.
+    }
   }
 
   copyTextWithFallback(text);
@@ -2059,12 +2081,18 @@ function copyTextWithFallback(text) {
   const textarea = document.createElement("textarea");
   textarea.value = text;
   textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.top = "-9999px";
-  textarea.style.left = "-9999px";
-  document.body.appendChild(textarea);
+  textarea.style.position = "absolute";
+  textarea.style.width = "1px";
+  textarea.style.height = "1px";
+  textarea.style.padding = "0";
+  textarea.style.border = "0";
+  textarea.style.opacity = "0";
+  textarea.style.pointerEvents = "none";
+  const copyHost = elements.reportDialog.open ? elements.reportDialog : document.body;
+  copyHost.appendChild(textarea);
   textarea.focus();
   textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
 
   const copied = document.execCommand("copy");
   textarea.remove();
@@ -2074,19 +2102,9 @@ function copyTextWithFallback(text) {
   }
 }
 
-function showTemporaryButtonText(button, text) {
-  const originalText = button.textContent;
-  button.textContent = text;
-  button.disabled = true;
-
-  window.setTimeout(() => {
-    if (!button.isConnected) {
-      return;
-    }
-
-    button.textContent = originalText;
-    button.disabled = false;
-  }, 1400);
+function setCopyReportStatus(message) {
+  elements.copyReportStatus.textContent = message;
+  elements.copyReportStatus.hidden = !message;
 }
 
 function buildReport() {
@@ -2437,12 +2455,16 @@ function updateTodayTotals() {
     elements.bucketTotalElements[bucket].textContent = formatDuration(report.totals[bucket]);
   });
   renderBucketTotals(report.totals);
-  renderGoalTotals(report.goals);
+  renderGoalTotals(getGoalsByPriority(report.goals));
   updateTimeGoal(totalMs);
 }
 
 function getBucketsByTotal(totals) {
   return [...BUCKETS].sort((a, b) => (totals[b] || 0) - (totals[a] || 0) || BUCKETS.indexOf(a) - BUCKETS.indexOf(b));
+}
+
+function getGoalsByPriority(goals) {
+  return [...goals].sort((a, b) => a.rowIndex - b.rowIndex);
 }
 
 function renderBucketTotals(totals) {

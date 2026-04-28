@@ -6,7 +6,7 @@ Timekeeper is a lightweight browser-based time tracker for organizing a day of w
 
 ### Track Your Day
 
-Use the time pane to set a daily time goal in hours and minutes. The app shows total elapsed time, total work time excluding Personal, remaining time, bucket totals for Admin, Operations, Projects, and Personal, and goal totals sorted by time spent.
+Use the time pane to set a daily time goal in hours and minutes. The app shows total elapsed time, total work time excluding Personal, remaining time, bucket totals for Admin, Operations, Projects, and Personal, and goal totals ordered by priority.
 
 When remaining time reaches zero, Timekeeper plays a chime.
 
