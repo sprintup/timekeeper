@@ -1,6 +1,7 @@
 const STORAGE_KEY = "timekeeper.tasks.v1";
 const BUCKETS = ["Admin", "Operations", "Projects", "Break"];
 const DEFAULT_TIME_GOAL_MS = 8 * 60 * 60 * 1000;
+const LOG_ADJUSTMENT_MS = 60 * 1000;
 
 const state = {
   tasks: [],
@@ -43,6 +44,8 @@ function cacheElements() {
     Break: document.getElementById("breakTotalTime"),
   };
   elements.goalTotals = document.getElementById("goalTotals");
+  elements.urgentIndicator = document.getElementById("urgentIndicator");
+  elements.urgentIndicatorText = document.getElementById("urgentIndicatorText");
   elements.generateReportButton = document.getElementById("generateReportButton");
   elements.clearCompletedButton = document.getElementById("clearCompletedButton");
   elements.exportDataButton = document.getElementById("exportDataButton");
@@ -204,6 +207,10 @@ function handleDocumentClick(event) {
     toggleTimer(taskId);
   }
 
+  if (action === "toggle-urgent") {
+    toggleUrgent(taskId);
+  }
+
   if (action === "finish-task") {
     finishTask(taskId);
   }
@@ -237,6 +244,14 @@ function handleDocumentClick(event) {
 
   if (action === "edit-log") {
     openLogDialog(taskId, actionElement.dataset.logId);
+  }
+
+  if (action === "extend-log-start") {
+    extendLogStart(taskId, actionElement.dataset.logId);
+  }
+
+  if (action === "extend-log-end") {
+    extendLogEnd(taskId, actionElement.dataset.logId);
   }
 
   if (action === "delete-log") {
@@ -440,6 +455,7 @@ function sanitizeTask(task) {
     order: clampInteger(task.order, 0),
     createdAt: task.createdAt || new Date().toISOString(),
     finishedAt: task.finishedAt || null,
+    urgent: task.urgent === true,
     finishNotes,
     logs,
   };
@@ -583,6 +599,7 @@ function render() {
   });
 
   elements.board.appendChild(createAddTaskFooter(rows.length === 0));
+  updateUrgentIndicator();
   tick();
 }
 
@@ -640,6 +657,7 @@ function createTaskCard(task) {
   const elapsed = fragment.querySelector(".elapsed-time");
   const finished = fragment.querySelector(".finished-time");
   const toggleButton = fragment.querySelector('[data-action="toggle-timer"]');
+  const urgentButton = fragment.querySelector('[data-action="toggle-urgent"]');
   const timeLogButton = fragment.querySelector('[data-action="show-log"]');
   const notesButton = fragment.querySelector('[data-action="show-notes"]');
 
@@ -647,6 +665,7 @@ function createTaskCard(task) {
   card.classList.toggle("is-running", isTaskRunning(task));
   card.classList.toggle("is-finished", task.status === "finished");
   card.classList.toggle("is-unstarted", !getFirstStartedAt(task));
+  card.classList.toggle("is-urgent", task.urgent);
   dragHandle.addEventListener("pointerdown", handleTaskPointerDown);
 
   bucket.value = task.bucket;
@@ -657,6 +676,8 @@ function createTaskCard(task) {
   elapsed.textContent = formatDuration(getTaskElapsed(task));
   finished.textContent = task.finishedAt ? formatTime(task.finishedAt) : "";
   toggleButton.textContent = isTaskRunning(task) ? "Pause" : "Start";
+  urgentButton.classList.toggle("is-active", task.urgent);
+  urgentButton.setAttribute("aria-pressed", String(task.urgent));
   timeLogButton.textContent = `Show time log (${task.logs.length})`;
   notesButton.textContent = `Show notes (${task.finishNotes.length})`;
 
@@ -692,6 +713,30 @@ function renderTimeLogModal() {
 
     const actions = document.createElement("div");
     actions.className = "log-actions";
+
+    if (!log.manual && log.start) {
+      const plusButton = document.createElement("button");
+      plusButton.className = "icon-button log-adjust-button";
+      plusButton.dataset.action = "extend-log-start";
+      plusButton.dataset.logId = log.id;
+      plusButton.type = "button";
+      plusButton.title = "Move start time 1 minute earlier";
+      plusButton.setAttribute("aria-label", "Move start time 1 minute earlier");
+      plusButton.textContent = "+";
+      actions.appendChild(plusButton);
+
+      if (log.end) {
+        const minusButton = document.createElement("button");
+        minusButton.className = "icon-button log-adjust-button";
+        minusButton.dataset.action = "extend-log-end";
+        minusButton.dataset.logId = log.id;
+        minusButton.type = "button";
+        minusButton.title = "Move stop time 1 minute later";
+        minusButton.setAttribute("aria-label", "Move stop time 1 minute later");
+        minusButton.textContent = "-";
+        actions.appendChild(minusButton);
+      }
+    }
 
     const editButton = document.createElement("button");
     editButton.className = "button button-small";
@@ -805,8 +850,6 @@ function handleTaskPointerDown(event) {
   activeDrag = {
     type: "task",
     card,
-    fromRowIndex: Number(card.closest(".task-row")?.dataset.rowIndex),
-    wasRunning: isTaskRunning(findTask(card.dataset.taskId)),
     handle: event.currentTarget,
     pointerId: event.pointerId,
   };
@@ -859,11 +902,7 @@ function handleBoardPointerUp() {
   }
 
   if (activeDrag.type === "task") {
-    const fromRowIndex = activeDrag.fromRowIndex;
-    const destinationRowIndex = Number(activeDrag.card.closest(".task-track")?.dataset.rowIndex);
-    const wasRunning = activeDrag.wasRunning;
     syncOrderFromDom();
-    promoteDestinationGoalIfNeeded(fromRowIndex, destinationRowIndex, wasRunning);
     cancelActiveDrag();
     render();
     return;
@@ -989,22 +1028,6 @@ function syncOrderFromDom() {
 
   normalizeBoard();
   saveState();
-}
-
-function promoteDestinationGoalIfNeeded(fromRowIndex, destinationRowIndex, shouldPromote) {
-  if (!shouldPromote) {
-    return;
-  }
-
-  if (!Number.isInteger(fromRowIndex) || !Number.isInteger(destinationRowIndex)) {
-    return;
-  }
-
-  if (destinationRowIndex <= fromRowIndex) {
-    return;
-  }
-
-  moveRow(destinationRowIndex, 0);
 }
 
 function openRowDialog(mode, rowIndex = "") {
@@ -1155,6 +1178,7 @@ function createTask({ objective, bucket, placement, rowIndex }) {
     order,
     createdAt: new Date().toISOString(),
     finishedAt: null,
+    urgent: false,
     finishNotes: [],
     logs: [],
   };
@@ -1338,6 +1362,17 @@ function toggleTimer(taskId) {
   render();
 }
 
+function toggleUrgent(taskId) {
+  const task = findTask(taskId);
+  if (!task) {
+    return;
+  }
+
+  task.urgent = !task.urgent;
+  saveState();
+  render();
+}
+
 function startTask(task) {
   const now = new Date();
   state.tasks.forEach((candidate) => {
@@ -1346,7 +1381,7 @@ function startTask(task) {
     }
   });
 
-  promoteTaskIfNeeded(task);
+  promoteTaskGoalIfNeeded(task);
   promoteTaskUrgency(task);
   task.status = "active";
   task.finishedAt = null;
@@ -1454,6 +1489,55 @@ function deleteLog(taskId, logId) {
 
   task.logs = task.logs.filter((log) => log.id !== logId);
   saveState();
+  if (activeTimeLogTaskId === taskId) {
+    renderTimeLogModal();
+  }
+  render();
+}
+
+function extendLogStart(taskId, logId) {
+  const log = findLog(taskId, logId);
+  if (!log || log.manual || !log.start) {
+    return;
+  }
+
+  const start = new Date(log.start);
+  if (Number.isNaN(start.getTime())) {
+    return;
+  }
+
+  log.start = new Date(start.getTime() - LOG_ADJUSTMENT_MS).toISOString();
+  updateTimedLogDuration(log);
+  saveState();
+  refreshTimeLogViews(taskId);
+}
+
+function extendLogEnd(taskId, logId) {
+  const log = findLog(taskId, logId);
+  if (!log || log.manual || !log.start || !log.end) {
+    return;
+  }
+
+  const end = new Date(log.end);
+  if (Number.isNaN(end.getTime())) {
+    return;
+  }
+
+  log.end = new Date(end.getTime() + LOG_ADJUSTMENT_MS).toISOString();
+  updateTimedLogDuration(log);
+  saveState();
+  refreshTimeLogViews(taskId);
+}
+
+function updateTimedLogDuration(log) {
+  if (log.manual || !log.start || !log.end) {
+    return;
+  }
+
+  log.durationMs = Math.max(0, new Date(log.end).getTime() - new Date(log.start).getTime());
+}
+
+function refreshTimeLogViews(taskId) {
   if (activeTimeLogTaskId === taskId) {
     renderTimeLogModal();
   }
@@ -1598,25 +1682,12 @@ function resetStateWithPrompt() {
   render();
 }
 
-function promoteTaskIfNeeded(task) {
+function promoteTaskGoalIfNeeded(task) {
   if (task.row === 0) {
     return;
   }
 
-  const originalRow = task.row;
-  state.tasks.forEach((candidate) => {
-    if (candidate.id === task.id) {
-      return;
-    }
-
-    if (candidate.row < originalRow) {
-      candidate.row += 1;
-    }
-  });
-
-  task.row = 0;
-  task.order = getNextOrder(0);
-  normalizeBoard();
+  moveRow(task.row, 0);
 }
 
 function promoteTaskUrgency(task) {
@@ -1907,6 +1978,10 @@ function findTask(taskId) {
   return state.tasks.find((task) => task.id === taskId);
 }
 
+function findLog(taskId, logId) {
+  return findTask(taskId)?.logs.find((log) => log.id === logId);
+}
+
 function getRunningLog(task) {
   return task.logs.find((log) => !log.manual && log.start && !log.end);
 }
@@ -2087,6 +2162,12 @@ function updateTodayTotals() {
   });
   renderGoalTotals(report.goals);
   updateTimeGoal(totalMs);
+}
+
+function updateUrgentIndicator() {
+  const urgentCount = state.tasks.filter((task) => task.urgent).length;
+  elements.urgentIndicator.hidden = urgentCount === 0;
+  elements.urgentIndicatorText.textContent = urgentCount === 1 ? "1 urgent task" : `${urgentCount} urgent tasks`;
 }
 
 function renderGoalTotals(goals) {

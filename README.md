@@ -33,13 +33,15 @@ Use **Add task** inside a goal to add work. Each task box has an objective and a
 - **Projects**: temporary work with a start and end date that creates a unique service, product, or outcome
 - **Break**: breaks, meals, personal time, appointments, and other time outside work categories
 
-The bucket dropdown is color coded. Drag task boxes within or across goals to reorganize the board. When the running task moves from a higher priority goal into a lower priority goal, that lower priority goal becomes Priority 1.
+The bucket dropdown is color coded. Drag task boxes within or across goals to reorganize the board without changing goal priority.
+
+Use **Urgent** on a task box to give it a red border and show a red urgent flag above the goal breakdown. If an urgent task is running, the task box stays green while the border remains red.
 
 ### Timers And Logs
 
-Click **Start** on a task box to begin timing, or use **Save and start** when creating a task. Starting another task pauses the current one. Click **Pause** to stop the active timer.
+Click **Start** on a task box to begin timing, or use **Save and start** when creating a task. Starting a task in a lower priority goal promotes that whole goal to Priority 1 and moves the task to the left of that goal. Starting another task pauses the current one. Click **Pause** to stop the active timer.
 
-Use **Show time log** to review, add, edit, or delete time entries for a task box. Use **Show notes** to open the notes modal without finishing the task.
+Use **Show time log** to review, add, edit, delete, or nudge time entries for a task box. Use `+` to move a log start time one minute earlier and `-` to move a stopped log's end time one minute later. Use **Show notes** to open the notes modal without finishing the task.
 
 Use **Finish** to mark a task complete and open the notes modal. Add, edit, or delete notes there; finished tasks with no notes appear in reports as `finished`. Press **Finish** again on a completed task to add or manage notes. Completed task boxes move to the end of their goal. Use **Clear completed tasks** to remove finished task boxes.
 

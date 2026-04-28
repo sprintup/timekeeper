@@ -50,6 +50,10 @@
               <dd id="breakTotalTime">0h 00m 00s</dd>
             </div>
           </dl>
+          <div class="urgent-indicator" id="urgentIndicator" hidden>
+            <span class="urgent-flag" aria-hidden="true"></span>
+            <span id="urgentIndicatorText">Urgent tasks</span>
+          </div>
           <section class="goal-breakdown" aria-labelledby="goalBreakdownTitle">
             <h3 id="goalBreakdownTitle">Goal breakdown</h3>
             <div class="goal-totals" id="goalTotals"></div>
@@ -64,7 +68,8 @@
             <ol>
               <li>Set a time goal, then use the remaining-time countdown to track progress against the day.</li>
               <li>Add named goals for groups of work, then use Add task inside each goal. Rename or delete goals from the goal label.</li>
-              <li>Start one task at a time. Starting another task pauses the active timer and promotes the new task to the top-left priority position.</li>
+              <li>Start one task at a time. Starting another task pauses the active timer, promotes that task's goal to Priority 1, and moves the task to the left of that goal.</li>
+              <li>Use Urgent on a task tile to add a red border and show the urgent flag above the goal breakdown.</li>
               <li>Use the drag handles to rearrange goals vertically or task boxes within and across goals.</li>
               <li>Open Show time log to add, edit, or delete entries. Generate reports, or use Export data and Import data to move the full board between browsers.</li>
             </ol>
@@ -125,6 +130,7 @@
         <button class="button button-small notes-button" data-action="show-notes" type="button">Show notes</button>
         <div class="task-actions">
           <button class="button button-small button-start" data-action="toggle-timer" type="button">Start</button>
+          <button class="button button-small button-urgent" data-action="toggle-urgent" type="button">Urgent</button>
           <button class="button button-small" data-action="finish-task" type="button">Finish</button>
           <button class="button button-small button-restart" data-action="restart-task" type="button">Restart</button>
           <button class="button button-small button-danger" data-action="delete-task" type="button">Delete</button>
