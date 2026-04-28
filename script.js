@@ -13,6 +13,7 @@ const state = {
 const elements = {};
 let activeDrag = null;
 let activeTimeLogTaskId = null;
+let activeFinishNoteTaskId = null;
 let previousGoalRemainingMs = null;
 let chimeAudioContext = null;
 
@@ -75,6 +76,15 @@ function cacheElements() {
   elements.timeLogDialogTitle = document.getElementById("timeLogDialogTitle");
   elements.timeLogList = document.getElementById("timeLogList");
 
+  elements.finishNoteDialog = document.getElementById("finishNoteDialog");
+  elements.finishNoteDialogTitle = document.getElementById("finishNoteDialogTitle");
+  elements.finishNoteList = document.getElementById("finishNoteList");
+  elements.finishNoteForm = document.getElementById("finishNoteForm");
+  elements.finishNoteTaskIdInput = document.getElementById("finishNoteTaskIdInput");
+  elements.finishNoteIdInput = document.getElementById("finishNoteIdInput");
+  elements.finishNoteInput = document.getElementById("finishNoteInput");
+  elements.finishNoteSubmitButton = document.getElementById("finishNoteSubmitButton");
+
   elements.reportDialog = document.getElementById("reportDialog");
   elements.reportForm = document.getElementById("reportForm");
   elements.reportPreview = document.getElementById("reportPreview");
@@ -92,6 +102,7 @@ function bindEvents() {
   elements.taskForm.addEventListener("submit", saveTaskFromDialog);
   elements.rowForm.addEventListener("submit", saveRowFromDialog);
   elements.logForm.addEventListener("submit", saveManualLogFromDialog);
+  elements.finishNoteForm.addEventListener("submit", saveFinishNoteFromDialog);
   elements.reportForm.addEventListener("submit", downloadReportFromDialog);
   elements.emailReportButton.addEventListener("click", emailReportFromDialog);
 
@@ -135,6 +146,12 @@ function handleDocumentClick(event) {
     return;
   }
 
+  if (action === "close-finish-note-dialog") {
+    activeFinishNoteTaskId = null;
+    closeDialog(elements.finishNoteDialog);
+    return;
+  }
+
   if (action === "close-report-dialog") {
     closeDialog(elements.reportDialog);
     return;
@@ -164,6 +181,12 @@ function handleDocumentClick(event) {
     if (activeTimeLogTaskId) {
       openLogDialog(activeTimeLogTaskId);
     }
+    return;
+  }
+
+  if (action === "clear-finish-note-form") {
+    resetFinishNoteForm();
+    elements.finishNoteInput.focus();
     return;
   }
 
@@ -208,6 +231,14 @@ function handleDocumentClick(event) {
 
   if (action === "delete-log") {
     deleteLog(taskId, actionElement.dataset.logId);
+  }
+
+  if (action === "edit-finish-note") {
+    openFinishNoteDialog(taskId, actionElement.dataset.noteId);
+  }
+
+  if (action === "delete-finish-note") {
+    deleteFinishNote(taskId, actionElement.dataset.noteId);
   }
 }
 
@@ -280,6 +311,7 @@ function sanitizeTask(task) {
   const status = task.status === "finished" ? "finished" : "active";
   const bucket = sanitizeBucket(task.bucket);
   const logs = Array.isArray(task.logs) ? task.logs.map(sanitizeLog).filter(Boolean) : [];
+  const finishNotes = sanitizeFinishNotes(task.finishNotes, task.finishNote, task.finishedAt);
 
   return {
     id: String(task.id || createId()),
@@ -290,13 +322,45 @@ function sanitizeTask(task) {
     order: clampInteger(task.order, 0),
     createdAt: task.createdAt || new Date().toISOString(),
     finishedAt: task.finishedAt || null,
-    finishNote: sanitizeFinishNote(task.finishNote),
+    finishNotes,
     logs,
   };
 }
 
 function sanitizeFinishNote(note) {
   return typeof note === "string" ? note.trim().slice(0, 1000) : "";
+}
+
+function sanitizeFinishNotes(notes, legacyNote = "", finishedAt = "") {
+  const sanitized = Array.isArray(notes) ? notes.map(sanitizeFinishNoteEntry).filter(Boolean) : [];
+  const legacyText = sanitizeFinishNote(legacyNote);
+
+  if (sanitized.length === 0 && legacyText) {
+    sanitized.push({
+      id: createId(),
+      text: legacyText,
+      createdAt: finishedAt || new Date().toISOString(),
+    });
+  }
+
+  return sanitized;
+}
+
+function sanitizeFinishNoteEntry(note) {
+  if (!note || typeof note !== "object") {
+    return null;
+  }
+
+  const text = sanitizeFinishNote(note.text);
+  if (!text) {
+    return null;
+  }
+
+  return {
+    id: String(note.id || createId()),
+    text,
+    createdAt: note.createdAt || new Date().toISOString(),
+  };
 }
 
 function sanitizeBucket(bucket) {
@@ -527,6 +591,84 @@ function renderTimeLogModal() {
     item.append(details, actions);
     elements.timeLogList.appendChild(item);
   });
+}
+
+function openFinishNoteDialog(taskId, noteId = "") {
+  const task = findTask(taskId);
+  if (!task) {
+    return;
+  }
+
+  activeFinishNoteTaskId = taskId;
+  renderFinishNoteModal();
+  elements.finishNoteTaskIdInput.value = taskId;
+  elements.finishNoteIdInput.value = noteId;
+
+  const note = noteId ? task.finishNotes.find((candidate) => candidate.id === noteId) : null;
+  elements.finishNoteInput.value = note?.text || "";
+  elements.finishNoteSubmitButton.textContent = note ? "Save note" : "Add note";
+
+  openDialog(elements.finishNoteDialog);
+  elements.finishNoteInput.focus();
+}
+
+function renderFinishNoteModal() {
+  const task = findTask(activeFinishNoteTaskId);
+  if (!task) {
+    activeFinishNoteTaskId = null;
+    closeDialog(elements.finishNoteDialog);
+    return;
+  }
+
+  elements.finishNoteDialogTitle.textContent = task.objective;
+  elements.finishNoteList.innerHTML = "";
+
+  if (task.finishNotes.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty-log";
+    empty.textContent = 'No finish notes. Reports will show "finished".';
+    elements.finishNoteList.appendChild(empty);
+    return;
+  }
+
+  task.finishNotes.forEach((note) => {
+    const item = document.createElement("div");
+    item.className = "log-item";
+    item.dataset.taskId = task.id;
+
+    const details = document.createElement("span");
+    details.textContent = note.text;
+
+    const actions = document.createElement("div");
+    actions.className = "log-actions";
+
+    const editButton = document.createElement("button");
+    editButton.className = "button button-small";
+    editButton.dataset.action = "edit-finish-note";
+    editButton.dataset.noteId = note.id;
+    editButton.type = "button";
+    editButton.textContent = "Edit";
+
+    const deleteButton = document.createElement("button");
+    deleteButton.className = "button button-small button-danger";
+    deleteButton.dataset.action = "delete-finish-note";
+    deleteButton.dataset.noteId = note.id;
+    deleteButton.type = "button";
+    deleteButton.textContent = "Delete";
+
+    actions.append(editButton, deleteButton);
+    item.append(details, actions);
+    elements.finishNoteList.appendChild(item);
+  });
+}
+
+function resetFinishNoteForm() {
+  if (activeFinishNoteTaskId) {
+    elements.finishNoteTaskIdInput.value = activeFinishNoteTaskId;
+  }
+  elements.finishNoteIdInput.value = "";
+  elements.finishNoteInput.value = "";
+  elements.finishNoteSubmitButton.textContent = "Add note";
 }
 
 function handleTaskPointerDown(event) {
@@ -791,6 +933,11 @@ function deleteRow(rowIndex) {
     closeDialog(elements.logDialog);
   }
 
+  if (activeFinishNoteTaskId && deletedTaskIds.has(activeFinishNoteTaskId)) {
+    activeFinishNoteTaskId = null;
+    closeDialog(elements.finishNoteDialog);
+  }
+
   render();
 }
 
@@ -866,7 +1013,7 @@ function createTask({ objective, bucket, placement, rowIndex }) {
     order,
     createdAt: new Date().toISOString(),
     finishedAt: null,
-    finishNote: "",
+    finishNotes: [],
     logs: [],
   };
 }
@@ -953,6 +1100,41 @@ function saveManualLogFromDialog(event) {
   render();
 }
 
+function saveFinishNoteFromDialog(event) {
+  event.preventDefault();
+
+  const task = findTask(elements.finishNoteTaskIdInput.value);
+  if (!task) {
+    return;
+  }
+
+  const noteText = sanitizeFinishNote(elements.finishNoteInput.value);
+  if (!noteText) {
+    window.alert('Enter a note, or close the modal to use "finished" in reports.');
+    return;
+  }
+
+  const noteId = elements.finishNoteIdInput.value;
+  if (noteId) {
+    const note = task.finishNotes.find((candidate) => candidate.id === noteId);
+    if (note) {
+      note.text = noteText;
+    }
+  } else {
+    task.finishNotes.push({
+      id: createId(),
+      text: noteText,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  saveState();
+  resetFinishNoteForm();
+  renderFinishNoteModal();
+  render();
+  elements.finishNoteInput.focus();
+}
+
 function buildLogDraft({ existingLog, startValue, endValue, minutes }) {
   const now = new Date();
   const durationMs = Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes * 60 * 1000) : 0;
@@ -1026,7 +1208,7 @@ function startTask(task) {
   promoteTaskUrgency(task);
   task.status = "active";
   task.finishedAt = null;
-  task.finishNote = "";
+  task.finishNotes = [];
   task.logs.push({
     id: createId(),
     start: now.toISOString(),
@@ -1066,23 +1248,20 @@ function enforceSingleRunningLog() {
 
 function finishTask(taskId) {
   const task = findTask(taskId);
-  if (!task || task.status === "finished") {
-    return;
-  }
-
-  const note = window.prompt('Add finish notes. Leave blank to use "finished".', task.finishNote || "");
-  if (note === null) {
+  if (!task) {
     return;
   }
 
   const now = new Date();
-  pauseTask(task, now);
-  task.status = "finished";
-  task.finishedAt = now.toISOString();
-  task.finishNote = sanitizeFinishNote(note);
+  if (task.status !== "finished") {
+    pauseTask(task, now);
+    task.status = "finished";
+    task.finishedAt = now.toISOString();
+  }
   normalizeBoard();
   saveState();
   render();
+  openFinishNoteDialog(taskId);
 }
 
 function restartTask(taskId) {
@@ -1093,7 +1272,7 @@ function restartTask(taskId) {
 
   task.status = "active";
   task.finishedAt = null;
-  task.finishNote = "";
+  task.finishNotes = [];
   saveState();
   render();
 }
@@ -1112,6 +1291,18 @@ function deleteTask(taskId) {
   state.tasks = state.tasks.filter((candidate) => candidate.id !== taskId);
   normalizeBoard();
   saveState();
+
+  if (activeTimeLogTaskId === taskId) {
+    activeTimeLogTaskId = null;
+    closeDialog(elements.timeLogDialog);
+    closeDialog(elements.logDialog);
+  }
+
+  if (activeFinishNoteTaskId === taskId) {
+    activeFinishNoteTaskId = null;
+    closeDialog(elements.finishNoteDialog);
+  }
+
   render();
 }
 
@@ -1125,6 +1316,26 @@ function deleteLog(taskId, logId) {
   saveState();
   if (activeTimeLogTaskId === taskId) {
     renderTimeLogModal();
+  }
+  render();
+}
+
+function deleteFinishNote(taskId, noteId) {
+  const task = findTask(taskId);
+  if (!task) {
+    return;
+  }
+
+  const confirmed = window.confirm("Delete this finish note?");
+  if (!confirmed) {
+    return;
+  }
+
+  task.finishNotes = task.finishNotes.filter((note) => note.id !== noteId);
+  saveState();
+  if (activeFinishNoteTaskId === taskId) {
+    resetFinishNoteForm();
+    renderFinishNoteModal();
   }
   render();
 }
@@ -1175,6 +1386,11 @@ function clearCompletedTasks() {
   if (activeTimeLogTaskId && !findTask(activeTimeLogTaskId)) {
     activeTimeLogTaskId = null;
     closeDialog(elements.timeLogDialog);
+    closeDialog(elements.logDialog);
+  }
+  if (activeFinishNoteTaskId && !findTask(activeFinishNoteTaskId)) {
+    activeFinishNoteTaskId = null;
+    closeDialog(elements.finishNoteDialog);
   }
   render();
 }
@@ -1233,9 +1449,11 @@ function resetStateWithPrompt() {
   previousGoalRemainingMs = null;
   setTimeGoalInputs(state.timeGoalMs);
   activeTimeLogTaskId = null;
+  activeFinishNoteTaskId = null;
   window.localStorage.removeItem(STORAGE_KEY);
   closeDialog(elements.timeLogDialog);
   closeDialog(elements.logDialog);
+  closeDialog(elements.finishNoteDialog);
   closeDialog(elements.reportDialog);
   render();
 }
@@ -1329,12 +1547,14 @@ function renderReportPreview() {
           objectiveSummary.textContent = `${objective.objective} (${objective.bucket}) - ${formatDuration(objective.durationMs)}`;
           objectiveItem.appendChild(objectiveSummary);
 
-          if (objective.note) {
+          if (objective.notes.length > 0) {
             const noteList = document.createElement("ul");
             noteList.className = "report-note-list";
-            const noteItem = document.createElement("li");
-            noteItem.textContent = objective.note;
-            noteList.appendChild(noteItem);
+            objective.notes.forEach((note) => {
+              const noteItem = document.createElement("li");
+              noteItem.textContent = note;
+              noteList.appendChild(noteItem);
+            });
             objectiveItem.appendChild(noteList);
           }
 
@@ -1426,7 +1646,7 @@ function buildReport() {
         objective: task.objective,
         bucket: task.bucket,
         durationMs,
-        note: getTaskFinishMessage(task),
+        notes: getTaskFinishMessages(task),
         logs: logEntries,
       });
       goalObjectives.set(task.row, objectives);
@@ -1476,9 +1696,9 @@ function buildReportText(report = buildReport()) {
       lines.push(`${goal.label} - ${formatDuration(goal.durationMs)}`);
       goal.objectives.forEach((objective) => {
         lines.push(`  ${objective.objective} (${objective.bucket}) - ${formatDuration(objective.durationMs)}`);
-        if (objective.note) {
-          lines.push(`    ${objective.note}`);
-        }
+        objective.notes.forEach((note) => {
+          lines.push(`    ${note}`);
+        });
       });
     });
   }
@@ -1617,17 +1837,21 @@ function createReportLogEntry(log, task, reportStart, reportEnd) {
     start: logWindow.start,
     end: logWindow.end,
     sortTime: logWindow.sortTime,
-    note: getTaskFinishMessage(task),
+    notes: getTaskFinishMessages(task),
     label: formatReportLogLabel(log, durationMs, reportStart, reportEnd),
   };
 }
 
-function getTaskFinishMessage(task) {
+function getTaskFinishMessages(task) {
   if (task.status !== "finished" && !task.finishedAt) {
-    return "";
+    return [];
   }
 
-  return task.finishNote || "finished";
+  const notes = Array.isArray(task.finishNotes)
+    ? task.finishNotes.map((note) => note.text).filter(Boolean)
+    : [];
+
+  return notes.length > 0 ? notes : ["finished"];
 }
 
 function getLogDurationWithinRange(log, reportStart, reportEnd) {
@@ -1685,8 +1909,8 @@ function formatTimelineEntry(entry) {
   const timeRange = entry.start
     ? `${formatTime(entry.start)} - ${entry.end ? formatTime(entry.end) : "Running"}`
     : entry.label.replace(/\s+\(.+\)$/, "");
-  const note = entry.note ? ` | ${entry.note}` : "";
-  return `${timeRange} (${formatDuration(entry.durationMs)}) | ${entry.bucket} | ${entry.objective}${note}`;
+  const notes = entry.notes.length > 0 ? ` | ${entry.notes.join("; ")}` : "";
+  return `${timeRange} (${formatDuration(entry.durationMs)}) | ${entry.objective} | ${entry.bucket}${notes}`;
 }
 
 function tick() {

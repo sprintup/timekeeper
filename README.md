@@ -41,7 +41,7 @@ Click **Start** on a task box to begin timing, or use **Save and start** when cr
 
 Use **Show time log** to review, add, edit, or delete time entries for a task box.
 
-Use **Finish** to mark a task complete. Timekeeper will ask for optional finish notes; blank notes appear in reports as `finished`. Completed task boxes move to the end of their goal. Use **Clear completed tasks** to remove finished task boxes.
+Use **Finish** to mark a task complete and open the finish notes modal. Add, edit, or delete finish notes there; tasks with no notes appear in reports as `finished`. Press **Finish** again on a completed task to add or manage notes. Completed task boxes move to the end of their goal. Use **Clear completed tasks** to remove finished task boxes.
 
 ### Reports
 

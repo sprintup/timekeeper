@@ -748,8 +748,7 @@ body.is-board-dragging * {
   display: none;
 }
 
-.task-card.is-finished .button-start,
-.task-card.is-finished [data-action="finish-task"] {
+.task-card.is-finished .button-start {
   display: none;
 }
 
@@ -814,6 +813,11 @@ body.is-board-dragging * {
   display: grid;
   gap: 16px;
   padding: 20px;
+}
+
+.modal .finish-note-form {
+  gap: 12px;
+  padding: 0;
 }
 
 .modal-body {
