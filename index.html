@@ -45,7 +45,15 @@
               <dt>Projects</dt>
               <dd id="projectsTotalTime">0h 00m 00s</dd>
             </div>
+            <div data-bucket="Non-work">
+              <dt>Non-work</dt>
+              <dd id="nonWorkTotalTime">0h 00m 00s</dd>
+            </div>
           </dl>
+          <section class="goal-breakdown" aria-labelledby="goalBreakdownTitle">
+            <h3 id="goalBreakdownTitle">Goal breakdown</h3>
+            <div class="goal-totals" id="goalTotals"></div>
+          </section>
         </section>
       </header>
 
@@ -91,6 +99,7 @@
             <option>Admin</option>
             <option>Operations</option>
             <option>Projects</option>
+            <option>Non-work</option>
           </select>
           <button class="icon-button" data-action="edit-task" type="button" aria-label="Edit task">Edit</button>
         </div>
@@ -138,6 +147,7 @@
             <option>Admin</option>
             <option>Operations</option>
             <option>Projects</option>
+            <option>Non-work</option>
           </select>
         </label>
         <details class="category-helper" id="taskCategoryGuide">
@@ -154,6 +164,10 @@
             <section>
               <h3>Projects</h3>
               <p>Temporary work with a start and end date that creates a unique service, product, or outcome.</p>
+            </section>
+            <section>
+              <h3>Non-work</h3>
+              <p>Breaks, meals, personal time, appointments, and other time outside work categories.</p>
             </section>
           </div>
         </details>

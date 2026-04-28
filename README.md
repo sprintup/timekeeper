@@ -6,7 +6,7 @@ Timekeeper is a lightweight browser-based time tracker for organizing a day of w
 
 ### Track Your Day
 
-Use the time pane at the top to set a daily time goal in hours and minutes. The app shows total elapsed time, remaining time, and bucket totals for Admin, Operations, and Projects.
+Use the time pane at the top to set a daily time goal in hours and minutes. The app shows total elapsed time, remaining time, bucket totals for Admin, Operations, Projects, and Non-work, and goal totals for the day.
 
 When remaining time reaches zero, Timekeeper plays a chime.
 
@@ -31,6 +31,7 @@ Use **Add task** inside a goal to add work. Each task box has an objective and a
 - **Admin**: vacation, sick time, holidays, professional development, email, and meetings not tied to a project
 - **Operations**: service requests, incidents, existing responsibilities, break/fix work, and delivery support
 - **Projects**: temporary work with a start and end date that creates a unique service, product, or outcome
+- **Non-work**: breaks, meals, personal time, appointments, and other time outside work categories
 
 The bucket dropdown is color coded. Drag task boxes within or across goals to reorganize the board.
 
@@ -40,15 +41,15 @@ Click **Start** on a task box to begin timing, or use **Save and start** when cr
 
 Use **Show time log** to review, add, edit, or delete time entries for a task box.
 
-Use **Finish** to mark a task complete. Completed task boxes move to the end of their goal. Use **Clear completed tasks** to remove finished task boxes.
+Use **Finish** to mark a task complete. Timekeeper will ask for optional finish notes; blank notes appear in reports as `finished`. Completed task boxes move to the end of their goal. Use **Clear completed tasks** to remove finished task boxes.
 
 ### Reports
 
 Click **Generate report** to preview the report for today. The report includes:
 
 - Bucket totals
-- Objective totals
-- Timeline of worked time, listed at the bottom
+- Goal totals sorted by most time, with indented objective totals and finish notes
+- Timeline of worked time, listed at the bottom with finish notes at the end of each finished task entry
 
 You can download the report as a text file or open a prefilled email draft with the report content. The **Delete time logs after download** checkbox is checked by default when the report modal opens.
 

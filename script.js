@@ -1,5 +1,5 @@
 const STORAGE_KEY = "timekeeper.tasks.v1";
-const BUCKETS = ["Admin", "Operations", "Projects"];
+const BUCKETS = ["Admin", "Operations", "Projects", "Non-work"];
 const DEFAULT_TIME_GOAL_MS = 8 * 60 * 60 * 1000;
 
 const state = {
@@ -39,7 +39,9 @@ function cacheElements() {
     Admin: document.getElementById("adminTotalTime"),
     Operations: document.getElementById("operationsTotalTime"),
     Projects: document.getElementById("projectsTotalTime"),
+    "Non-work": document.getElementById("nonWorkTotalTime"),
   };
+  elements.goalTotals = document.getElementById("goalTotals");
   elements.generateReportButton = document.getElementById("generateReportButton");
   elements.clearCompletedButton = document.getElementById("clearCompletedButton");
   elements.resetStateButton = document.getElementById("resetStateButton");
@@ -288,8 +290,13 @@ function sanitizeTask(task) {
     order: clampInteger(task.order, 0),
     createdAt: task.createdAt || new Date().toISOString(),
     finishedAt: task.finishedAt || null,
+    finishNote: sanitizeFinishNote(task.finishNote),
     logs,
   };
+}
+
+function sanitizeFinishNote(note) {
+  return typeof note === "string" ? note.trim().slice(0, 1000) : "";
 }
 
 function sanitizeLog(log) {
@@ -851,6 +858,7 @@ function createTask({ objective, bucket, placement, rowIndex }) {
     order,
     createdAt: new Date().toISOString(),
     finishedAt: null,
+    finishNote: "",
     logs: [],
   };
 }
@@ -1010,6 +1018,7 @@ function startTask(task) {
   promoteTaskUrgency(task);
   task.status = "active";
   task.finishedAt = null;
+  task.finishNote = "";
   task.logs.push({
     id: createId(),
     start: now.toISOString(),
@@ -1049,7 +1058,12 @@ function enforceSingleRunningLog() {
 
 function finishTask(taskId) {
   const task = findTask(taskId);
-  if (!task) {
+  if (!task || task.status === "finished") {
+    return;
+  }
+
+  const note = window.prompt('Add finish notes. Leave blank to use "finished".', task.finishNote || "");
+  if (note === null) {
     return;
   }
 
@@ -1057,6 +1071,7 @@ function finishTask(taskId) {
   pauseTask(task, now);
   task.status = "finished";
   task.finishedAt = now.toISOString();
+  task.finishNote = sanitizeFinishNote(note);
   normalizeBoard();
   saveState();
   render();
@@ -1070,6 +1085,7 @@ function restartTask(taskId) {
 
   task.status = "active";
   task.finishedAt = null;
+  task.finishNote = "";
   saveState();
   render();
 }
@@ -1281,18 +1297,45 @@ function renderReportPreview() {
     totals.append(term, detail);
   });
 
-  const objectiveHeading = document.createElement("h4");
-  objectiveHeading.textContent = "Objectives";
-  const objectiveList = document.createElement("ul");
-  if (report.objectives.length === 0) {
+  const goalHeading = document.createElement("h4");
+  goalHeading.textContent = "Goals";
+  const goalList = document.createElement("ul");
+  if (report.goals.length === 0) {
     const item = document.createElement("li");
     item.textContent = "No time logged.";
-    objectiveList.appendChild(item);
+    goalList.appendChild(item);
   } else {
-    report.objectives.forEach((entry) => {
+    report.goals.forEach((entry) => {
       const item = document.createElement("li");
-      item.textContent = `${entry.objective} (${entry.bucket}) - ${formatDuration(entry.durationMs)}`;
-      objectiveList.appendChild(item);
+
+      const summary = document.createElement("span");
+      summary.textContent = `${entry.label} - ${formatDuration(entry.durationMs)}`;
+      item.appendChild(summary);
+
+      if (entry.objectives.length > 0) {
+        const nestedList = document.createElement("ul");
+        nestedList.className = "report-nested-list";
+        entry.objectives.forEach((objective) => {
+          const objectiveItem = document.createElement("li");
+          const objectiveSummary = document.createElement("span");
+          objectiveSummary.textContent = `${objective.objective} (${objective.bucket}) - ${formatDuration(objective.durationMs)}`;
+          objectiveItem.appendChild(objectiveSummary);
+
+          if (objective.note) {
+            const noteList = document.createElement("ul");
+            noteList.className = "report-note-list";
+            const noteItem = document.createElement("li");
+            noteItem.textContent = objective.note;
+            noteList.appendChild(noteItem);
+            objectiveItem.appendChild(noteList);
+          }
+
+          nestedList.appendChild(objectiveItem);
+        });
+        item.appendChild(nestedList);
+      }
+
+      goalList.appendChild(item);
     });
   }
 
@@ -1311,7 +1354,7 @@ function renderReportPreview() {
     });
   }
 
-  elements.reportPreview.append(heading, summaryHeading, totals, objectiveHeading, objectiveList, timelineHeading, timelineList);
+  elements.reportPreview.append(heading, summaryHeading, totals, goalHeading, goalList, timelineHeading, timelineList);
 }
 
 function downloadReportFromDialog(event) {
@@ -1353,7 +1396,8 @@ function buildReport() {
   const reportStart = startOfToday();
   const reportEnd = new Date();
   const totals = Object.fromEntries(BUCKETS.map((bucket) => [bucket, 0]));
-  const objectives = [];
+  const goalTotals = new Map();
+  const goalObjectives = new Map();
   const timeline = [];
 
   getSortedTasks().forEach((task) => {
@@ -1363,23 +1407,40 @@ function buildReport() {
     const durationMs = logEntries.reduce((total, log) => total + log.durationMs, 0);
 
     totals[task.bucket] += durationMs;
+    const currentGoalMs = goalTotals.get(task.row) || 0;
+    goalTotals.set(task.row, currentGoalMs + durationMs);
     timeline.push(...logEntries);
     if (durationMs > 0) {
+      const objectives = goalObjectives.get(task.row) || [];
       objectives.push({
         objective: task.objective,
         bucket: task.bucket,
         durationMs,
+        note: getTaskFinishMessage(task),
         logs: logEntries,
       });
+      goalObjectives.set(task.row, objectives);
     }
   });
 
   return {
     rangeLabel: `${formatDateTime(reportStart)} - ${formatDateTime(reportEnd)}`,
     totals,
-    objectives,
+    goals: buildGoalReportEntries(goalTotals, goalObjectives),
     timeline: timeline.sort((a, b) => a.sortTime - b.sortTime),
   };
+}
+
+function buildGoalReportEntries(goalTotals, goalObjectives) {
+  return state.rows
+    .map((goal, rowIndex) => ({
+      rowIndex,
+      label: getRowName(rowIndex),
+      durationMs: goalTotals.get(rowIndex) || 0,
+      objectives: goalObjectives.get(rowIndex) || [],
+    }))
+    .filter((entry) => entry.durationMs > 0)
+    .sort((a, b) => b.durationMs - a.durationMs || a.rowIndex - b.rowIndex);
 }
 
 function buildReportText() {
@@ -1395,15 +1456,18 @@ function buildReportText() {
     lines.push(`${bucket} - ${formatDuration(report.totals[bucket])}`);
   });
 
-  lines.push("", "Objectives");
+  lines.push("", "Goals");
 
-  if (report.objectives.length === 0) {
+  if (report.goals.length === 0) {
     lines.push("No time logged.");
   } else {
-    report.objectives.forEach((entry) => {
-      lines.push(`${entry.objective} (${entry.bucket}) - ${formatDuration(entry.durationMs)}`);
-      entry.logs.forEach((log) => {
-        lines.push(`  ${log.label}`);
+    report.goals.forEach((goal) => {
+      lines.push(`${goal.label} - ${formatDuration(goal.durationMs)}`);
+      goal.objectives.forEach((objective) => {
+        lines.push(`  ${objective.objective} (${objective.bucket}) - ${formatDuration(objective.durationMs)}`);
+        if (objective.note) {
+          lines.push(`    ${objective.note}`);
+        }
       });
     });
   }
@@ -1538,8 +1602,17 @@ function createReportLogEntry(log, task, reportStart, reportEnd) {
     start: logWindow.start,
     end: logWindow.end,
     sortTime: logWindow.sortTime,
+    note: getTaskFinishMessage(task),
     label: formatReportLogLabel(log, durationMs, reportStart, reportEnd),
   };
+}
+
+function getTaskFinishMessage(task) {
+  if (task.status !== "finished" && !task.finishedAt) {
+    return "";
+  }
+
+  return task.finishNote || "finished";
 }
 
 function getLogDurationWithinRange(log, reportStart, reportEnd) {
@@ -1597,7 +1670,8 @@ function formatTimelineEntry(entry) {
   const timeRange = entry.start
     ? `${formatTime(entry.start)} - ${entry.end ? formatTime(entry.end) : "Running"}`
     : entry.label.replace(/\s+\(.+\)$/, "");
-  return `${timeRange} | ${entry.bucket} | ${entry.objective} (${formatDuration(entry.durationMs)})`;
+  const note = entry.note ? ` | ${entry.note}` : "";
+  return `${timeRange} (${formatDuration(entry.durationMs)}) | ${entry.bucket} | ${entry.objective}${note}`;
 }
 
 function tick() {
@@ -1632,7 +1706,34 @@ function updateTodayTotals() {
   BUCKETS.forEach((bucket) => {
     elements.bucketTotalElements[bucket].textContent = formatDuration(report.totals[bucket]);
   });
+  renderGoalTotals(report.goals);
   updateTimeGoal(totalMs);
+}
+
+function renderGoalTotals(goals) {
+  elements.goalTotals.innerHTML = "";
+
+  if (goals.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "goal-totals-empty";
+    empty.textContent = "No goal time logged.";
+    elements.goalTotals.appendChild(empty);
+    return;
+  }
+
+  goals.forEach((goal) => {
+    const item = document.createElement("div");
+    item.className = "goal-total-item";
+
+    const label = document.createElement("span");
+    label.textContent = goal.label;
+
+    const total = document.createElement("strong");
+    total.textContent = formatDuration(goal.durationMs);
+
+    item.append(label, total);
+    elements.goalTotals.appendChild(item);
+  });
 }
 
 function getTodayTotalMs() {

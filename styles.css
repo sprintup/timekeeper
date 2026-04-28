@@ -20,6 +20,8 @@
   --bucket-operations-line: #5b93c8;
   --bucket-projects: #ffebc2;
   --bucket-projects-line: #c99025;
+  --bucket-non-work: #ffe2ec;
+  --bucket-non-work-line: #c66b8a;
   --shadow: 0 14px 32px rgba(31, 37, 40, 0.12);
 }
 
@@ -252,7 +254,7 @@ button {
 
 .totals-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
   margin: 0;
 }
@@ -279,6 +281,11 @@ button {
   background: var(--bucket-projects);
 }
 
+.totals-grid [data-bucket="Non-work"] {
+  border-color: var(--bucket-non-work-line);
+  background: var(--bucket-non-work);
+}
+
 .totals-grid dt {
   color: var(--muted);
   font-size: 0.78rem;
@@ -291,6 +298,55 @@ button {
   color: var(--ink);
   font-weight: 900;
   font-size: 0.92rem;
+}
+
+.goal-breakdown {
+  display: grid;
+  gap: 8px;
+}
+
+.goal-breakdown h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.goal-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.goal-total-item,
+.goal-totals-empty {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px;
+  background: #fbfbf8;
+}
+
+.goal-total-item {
+  display: grid;
+  gap: 4px;
+}
+
+.goal-total-item span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.goal-total-item strong {
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
+.goal-totals-empty {
+  color: var(--muted);
+  font-weight: 800;
 }
 
 .button,
@@ -614,6 +670,11 @@ body.is-board-dragging * {
   background: var(--bucket-projects);
 }
 
+.bucket-select[data-bucket="Non-work"] {
+  border-color: var(--bucket-non-work-line);
+  background: var(--bucket-non-work);
+}
+
 .task-objective {
   margin: 14px 0 12px;
   min-height: 44px;
@@ -869,6 +930,17 @@ body.is-board-dragging * {
 .report-preview ul {
   margin: 0;
   padding-left: 18px;
+}
+
+.report-preview .report-nested-list {
+  margin-top: 4px;
+  padding-left: 22px;
+}
+
+.report-preview .report-note-list {
+  margin-top: 3px;
+  padding-left: 22px;
+  color: var(--muted);
 }
 
 .time-log-list {
