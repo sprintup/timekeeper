@@ -2285,14 +2285,14 @@ function getLogDurationWithinRange(log, reportStart, reportEnd) {
 function formatReportLogLabel(log, durationMs, reportStart, reportEnd) {
   const duration = formatDuration(durationMs);
   if (log.manual) {
-    const createdAt = formatTime(log.createdAt || reportStart);
+    const createdAt = formatDateTime(log.createdAt || reportStart);
     return `Manually added at ${createdAt} (${duration})`;
   }
 
   const start = new Date(Math.max(new Date(log.start).getTime(), reportStart.getTime()));
   const sourceEnd = log.end ? new Date(log.end) : new Date();
   const end = new Date(Math.min(sourceEnd.getTime(), reportEnd.getTime()));
-  return `${formatTime(start)} - ${log.end ? formatTime(end) : "Running"} (${duration})`;
+  return `${formatDateTime(start)} - ${log.end ? formatDateTime(end) : "Running"} (${duration})`;
 }
 
 function getReportLogWindow(log, reportStart, reportEnd) {
@@ -2318,7 +2318,7 @@ function getReportLogWindow(log, reportStart, reportEnd) {
 
 function formatTimelineEntry(entry) {
   const timeRange = entry.start
-    ? `${formatTime(entry.start)} - ${entry.end ? formatTime(entry.end) : "Running"}`
+    ? `${formatDateTime(entry.start)} - ${entry.end ? formatDateTime(entry.end) : "Running"}`
     : entry.label.replace(/\s+\(.+\)$/, "");
   const notes = entry.notes.length > 0 ? ` | ${entry.notes.join("; ")}` : "";
   return `${timeRange} (${formatDuration(entry.durationMs)}) | ${entry.objective} | ${entry.bucket}${notes}`;
