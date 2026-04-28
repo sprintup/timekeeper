@@ -838,12 +838,9 @@ function saveTaskFromDialog(event) {
 
 function createTask({ objective, bucket, placement, rowIndex }) {
   const row = placement === "side" ? (Number.isFinite(rowIndex) ? rowIndex : 0) : getBottomRowIndex() + 1;
-  const order = placement === "side" ? 0 : getNextOrder(row);
 
   ensureRowIndex(row);
-  if (placement === "side") {
-    makeRoomAtLeft(row);
-  }
+  const order = getNextOrder(row);
 
   return {
     id: createId(),
