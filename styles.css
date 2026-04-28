@@ -329,6 +329,13 @@ button {
   background: #ffffff;
 }
 
+.goal-sticky-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
 .urgent-indicator {
   display: inline-flex;
   align-items: center;
@@ -381,13 +388,9 @@ button {
 }
 
 .scroll-top-button {
-  position: fixed;
-  right: 18px;
-  bottom: 18px;
-  z-index: 30;
+  margin-left: auto;
   min-width: 72px;
-  min-height: 42px;
-  box-shadow: var(--shadow);
+  min-height: 34px;
 }
 
 .scroll-top-button[hidden] {
@@ -830,8 +833,19 @@ body.is-board-dragging * {
   background: rgba(255, 255, 255, 0.72);
 }
 
+.log-item.is-flagged {
+  border-color: var(--red);
+  background: var(--red-soft);
+}
+
 .log-item span {
   overflow-wrap: anywhere;
+}
+
+.button-flagged {
+  border-color: var(--red);
+  background: var(--red-soft);
+  color: #70251e;
 }
 
 .empty-log {
@@ -1086,6 +1100,38 @@ body.is-board-dragging * {
 
 .notes-list .log-item {
   align-items: start;
+}
+
+.flagged-note-item {
+  align-items: start;
+}
+
+.flagged-note-open {
+  appearance: none;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.flagged-note-open:hover .flagged-note-text,
+.flagged-note-open:focus-visible .flagged-note-text {
+  text-decoration: underline;
+}
+
+.flagged-note-context {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.flagged-note-text {
+  font-weight: 800;
 }
 
 .log-actions {

@@ -57,6 +57,7 @@ function cacheElements() {
   elements.importDataInput = document.getElementById("importDataInput");
   elements.resetStateButton = document.getElementById("resetStateButton");
   elements.scrollTopButton = document.getElementById("scrollTopButton");
+  elements.flaggedNotesButton = document.getElementById("flaggedNotesButton");
 
   elements.taskDialog = document.getElementById("taskDialog");
   elements.taskForm = document.getElementById("taskForm");
@@ -97,6 +98,9 @@ function cacheElements() {
   elements.finishNoteInput = document.getElementById("finishNoteInput");
   elements.finishNoteSubmitButton = document.getElementById("finishNoteSubmitButton");
 
+  elements.flaggedNotesDialog = document.getElementById("flaggedNotesDialog");
+  elements.flaggedNotesList = document.getElementById("flaggedNotesList");
+
   elements.reportDialog = document.getElementById("reportDialog");
   elements.reportForm = document.getElementById("reportForm");
   elements.reportPreview = document.getElementById("reportPreview");
@@ -129,6 +133,7 @@ function bindEvents() {
   elements.reportForm.addEventListener("submit", downloadReportFromDialog);
   elements.emailReportButton.addEventListener("click", emailReportFromDialog);
   elements.copyReportButton.addEventListener("click", copyReportFromDialog);
+  elements.flaggedNotesButton.addEventListener("click", openFlaggedNotesDialog);
   elements.scrollTopButton.addEventListener("click", scrollToTop);
 
   document.addEventListener("click", handleDocumentClick);
@@ -179,6 +184,11 @@ function handleDocumentClick(event) {
     return;
   }
 
+  if (action === "close-flagged-notes-dialog") {
+    closeDialog(elements.flaggedNotesDialog);
+    return;
+  }
+
   if (action === "close-report-dialog") {
     closeDialog(elements.reportDialog);
     return;
@@ -209,6 +219,11 @@ function handleDocumentClick(event) {
 
   if (action === "scroll-to-row") {
     scrollToRow(Number(actionElement.dataset.rowIndex));
+    return;
+  }
+
+  if (action === "open-flagged-note") {
+    openFlaggedNote(actionElement.dataset.taskId, actionElement.dataset.noteId);
     return;
   }
 
@@ -287,6 +302,10 @@ function handleDocumentClick(event) {
 
   if (action === "edit-finish-note") {
     openFinishNoteDialog(taskId, actionElement.dataset.noteId);
+  }
+
+  if (action === "toggle-finish-note-flag") {
+    toggleFinishNoteFlag(taskId, actionElement.dataset.noteId);
   }
 
   if (action === "delete-finish-note") {
@@ -468,6 +487,7 @@ function applyImportedState(importedState) {
   closeDialog(elements.timeLogDialog);
   closeDialog(elements.logDialog);
   closeDialog(elements.finishNoteDialog);
+  closeDialog(elements.flaggedNotesDialog);
   closeDialog(elements.reportDialog);
   render();
 }
@@ -531,6 +551,7 @@ function sanitizeFinishNoteEntry(note) {
   return {
     id: String(note.id || createId()),
     text,
+    flagged: note.flagged === true,
     createdAt: note.createdAt || new Date().toISOString(),
   };
 }
@@ -639,6 +660,10 @@ function render() {
 
   elements.board.appendChild(createAddTaskFooter(rows.length === 0));
   updateUrgentIndicator();
+  updateFlaggedNotesButton();
+  if (elements.flaggedNotesDialog.open) {
+    renderFlaggedNotesModal();
+  }
   tick();
 }
 
@@ -852,6 +877,7 @@ function renderFinishNoteModal() {
   task.finishNotes.forEach((note) => {
     const item = document.createElement("div");
     item.className = "log-item";
+    item.classList.toggle("is-flagged", note.flagged);
     item.dataset.taskId = task.id;
 
     const details = document.createElement("span");
@@ -867,6 +893,14 @@ function renderFinishNoteModal() {
     editButton.type = "button";
     editButton.textContent = "Edit";
 
+    const flagButton = document.createElement("button");
+    flagButton.className = "button button-small";
+    flagButton.classList.toggle("button-flagged", note.flagged);
+    flagButton.dataset.action = "toggle-finish-note-flag";
+    flagButton.dataset.noteId = note.id;
+    flagButton.type = "button";
+    flagButton.textContent = note.flagged ? "Unflag" : "Flag";
+
     const deleteButton = document.createElement("button");
     deleteButton.className = "button button-small button-danger";
     deleteButton.dataset.action = "delete-finish-note";
@@ -874,7 +908,7 @@ function renderFinishNoteModal() {
     deleteButton.type = "button";
     deleteButton.textContent = "Delete";
 
-    actions.append(editButton, deleteButton);
+    actions.append(editButton, flagButton, deleteButton);
     item.append(details, actions);
     elements.finishNoteList.appendChild(item);
   });
@@ -887,6 +921,108 @@ function resetFinishNoteForm() {
   elements.finishNoteIdInput.value = "";
   elements.finishNoteInput.value = "";
   elements.finishNoteSubmitButton.textContent = "Add note";
+}
+
+function toggleFinishNoteFlag(taskId, noteId) {
+  const task = findTask(taskId);
+  const note = task?.finishNotes.find((candidate) => candidate.id === noteId);
+  if (!task || !note) {
+    return;
+  }
+
+  note.flagged = !note.flagged;
+  saveState();
+
+  if (activeFinishNoteTaskId === taskId) {
+    renderFinishNoteModal();
+  }
+
+  if (elements.flaggedNotesDialog.open) {
+    renderFlaggedNotesModal();
+  }
+
+  updateFlaggedNotesButton();
+  render();
+}
+
+function openFlaggedNotesDialog() {
+  renderFlaggedNotesModal();
+  openDialog(elements.flaggedNotesDialog);
+}
+
+function renderFlaggedNotesModal() {
+  const flaggedNotes = getFlaggedNotes();
+  elements.flaggedNotesList.innerHTML = "";
+
+  if (flaggedNotes.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty-log";
+    empty.textContent = "No flagged notes.";
+    elements.flaggedNotesList.appendChild(empty);
+    return;
+  }
+
+  flaggedNotes.forEach(({ task, note }) => {
+    const item = document.createElement("div");
+    item.className = "log-item flagged-note-item";
+    item.dataset.taskId = task.id;
+
+    const openButton = document.createElement("button");
+    openButton.className = "flagged-note-open";
+    openButton.dataset.action = "open-flagged-note";
+    openButton.dataset.taskId = task.id;
+    openButton.dataset.noteId = note.id;
+    openButton.type = "button";
+
+    const context = document.createElement("span");
+    context.className = "flagged-note-context";
+    context.textContent = `${getRowName(task.row)} / ${task.objective}`;
+
+    const text = document.createElement("span");
+    text.className = "flagged-note-text";
+    text.textContent = note.text;
+
+    openButton.append(context, text);
+
+    const actions = document.createElement("div");
+    actions.className = "log-actions";
+
+    const unflagButton = document.createElement("button");
+    unflagButton.className = "button button-small button-flagged";
+    unflagButton.dataset.action = "toggle-finish-note-flag";
+    unflagButton.dataset.noteId = note.id;
+    unflagButton.type = "button";
+    unflagButton.textContent = "Unflag";
+
+    actions.appendChild(unflagButton);
+    item.append(openButton, actions);
+    elements.flaggedNotesList.appendChild(item);
+  });
+}
+
+function getFlaggedNotes() {
+  return getSortedTasks()
+    .flatMap((task) => task.finishNotes
+      .filter((note) => note.flagged)
+      .map((note) => ({ task, note })))
+    .sort((a, b) => (
+      a.task.row - b.task.row
+      || a.task.order - b.task.order
+      || new Date(a.note.createdAt).getTime() - new Date(b.note.createdAt).getTime()
+    ));
+}
+
+function openFlaggedNote(taskId, noteId) {
+  const task = findTask(taskId);
+  if (!task) {
+    return;
+  }
+
+  closeDialog(elements.flaggedNotesDialog);
+  scrollToRow(task.row);
+  window.setTimeout(() => {
+    openFinishNoteDialog(taskId, noteId);
+  }, 360);
 }
 
 function handleTaskPointerDown(event) {
@@ -1345,6 +1481,7 @@ function saveFinishNoteFromDialog(event) {
     task.finishNotes.push({
       id: createId(),
       text: noteText,
+      flagged: false,
       createdAt: new Date().toISOString(),
     });
   }
@@ -1882,6 +2019,7 @@ function resetStateWithPrompt() {
   closeDialog(elements.timeLogDialog);
   closeDialog(elements.logDialog);
   closeDialog(elements.finishNoteDialog);
+  closeDialog(elements.flaggedNotesDialog);
   closeDialog(elements.reportDialog);
   render();
 }
@@ -2480,6 +2618,11 @@ function updateUrgentIndicator() {
   const urgentCount = state.tasks.filter((task) => task.urgent).length;
   elements.urgentIndicator.hidden = urgentCount === 0;
   elements.urgentIndicatorText.textContent = urgentCount === 1 ? "1 urgent task" : `${urgentCount} urgent tasks`;
+}
+
+function updateFlaggedNotesButton() {
+  const flaggedCount = getFlaggedNotes().length;
+  elements.flaggedNotesButton.textContent = flaggedCount > 0 ? `Flagged (${flaggedCount})` : "Flagged";
 }
 
 function renderGoalTotals(goals) {

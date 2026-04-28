@@ -88,9 +88,13 @@
         <div class="goal-breakdown">
           <div class="goal-totals" id="goalTotals"></div>
         </div>
-        <div class="urgent-indicator" id="urgentIndicator" hidden>
-          <span class="urgent-flag" aria-hidden="true"></span>
-          <span id="urgentIndicatorText">Urgent tasks</span>
+        <div class="goal-sticky-footer">
+          <div class="urgent-indicator" id="urgentIndicator" hidden>
+            <span class="urgent-flag" aria-hidden="true"></span>
+            <span id="urgentIndicatorText">Urgent tasks</span>
+          </div>
+          <button class="button button-secondary flagged-notes-button" id="flaggedNotesButton" type="button">Flagged</button>
+          <button class="button button-secondary scroll-top-button" id="scrollTopButton" type="button" aria-label="Scroll to top" hidden>Top</button>
         </div>
       </section>
       <div class="top-divider" aria-hidden="true"></div>
@@ -253,6 +257,22 @@
       </div>
     </dialog>
 
+    <dialog class="modal modal-wide" id="flaggedNotesDialog">
+      <div class="modal-body">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Follow Up</p>
+            <h2>Flagged notes</h2>
+          </div>
+          <button class="icon-button" value="cancel" type="button" data-action="close-flagged-notes-dialog" aria-label="Close">Close</button>
+        </div>
+        <div class="time-log-list flagged-notes-list" id="flaggedNotesList"></div>
+        <div class="modal-actions">
+          <button class="button button-secondary" type="button" data-action="close-flagged-notes-dialog">Close</button>
+        </div>
+      </div>
+    </dialog>
+
     <dialog class="modal" id="logDialog">
       <form id="logForm" method="dialog">
         <div class="modal-header">
@@ -304,8 +324,6 @@
         </div>
       </form>
     </dialog>
-    <button class="button button-secondary scroll-top-button" id="scrollTopButton" type="button" aria-label="Scroll to top" hidden>Top</button>
-
     <script src="script.js"></script>
   </body>
 </html>

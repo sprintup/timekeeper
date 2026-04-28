@@ -43,7 +43,7 @@ Click **Start** on a task box to begin timing, or use **Save and start** when cr
 
 Use **Show time log** to review, add, edit, delete, or nudge time entries for a task box. Use the Start and End `-` / `+` controls to move those timestamps by one minute. Use **Show notes** to open the notes modal without finishing the task.
 
-Use **Finish** to mark a task complete and open the notes modal. Add, edit, or delete notes there; finished tasks with no notes appear in reports as `finished`. Press **Finish** again on a completed task to add or manage notes. Completed task boxes move to the end of their goal and are no longer urgent. Use **Hide Finished** to hide or show finished task boxes.
+Use **Finish** to mark a task complete and open the notes modal. Add, edit, delete, flag, or unflag notes there; finished tasks with no notes appear in reports as `finished`. Press **Finish** again on a completed task to add or manage notes. Completed task boxes move to the end of their goal and are no longer urgent. Use **Flagged** in the goal totals pane to review follow-up notes, jump back to the task notes, or unflag them. Use **Hide Finished** to hide or show finished task boxes.
 
 ### Reports
 
