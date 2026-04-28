@@ -33,7 +33,7 @@ Use **Add task** inside a goal to add work. Each task box has an objective and a
 - **Projects**: temporary work with a start and end date that creates a unique service, product, or outcome
 - **Break**: breaks, meals, personal time, appointments, and other time outside work categories
 
-The bucket dropdown is color coded. Drag task boxes within or across goals to reorganize the board.
+The bucket dropdown is color coded. Drag task boxes within or across goals to reorganize the board. When a task moves from a higher priority goal into a lower priority goal, that lower priority goal becomes Priority 1.
 
 ### Timers And Logs
 

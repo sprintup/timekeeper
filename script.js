@@ -685,6 +685,7 @@ function handleTaskPointerDown(event) {
   activeDrag = {
     type: "task",
     card,
+    fromRowIndex: Number(card.closest(".task-row")?.dataset.rowIndex),
     handle: event.currentTarget,
     pointerId: event.pointerId,
   };
@@ -737,7 +738,10 @@ function handleBoardPointerUp() {
   }
 
   if (activeDrag.type === "task") {
+    const fromRowIndex = activeDrag.fromRowIndex;
+    const destinationRowIndex = Number(activeDrag.card.closest(".task-track")?.dataset.rowIndex);
     syncOrderFromDom();
+    promoteDestinationGoalIfNeeded(fromRowIndex, destinationRowIndex);
     cancelActiveDrag();
     render();
     return;
@@ -863,6 +867,18 @@ function syncOrderFromDom() {
 
   normalizeBoard();
   saveState();
+}
+
+function promoteDestinationGoalIfNeeded(fromRowIndex, destinationRowIndex) {
+  if (!Number.isInteger(fromRowIndex) || !Number.isInteger(destinationRowIndex)) {
+    return;
+  }
+
+  if (destinationRowIndex <= fromRowIndex) {
+    return;
+  }
+
+  moveRow(destinationRowIndex, 0);
 }
 
 function openRowDialog(mode, rowIndex = "") {
