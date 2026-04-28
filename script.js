@@ -1360,12 +1360,13 @@ function renderReportPreview() {
 function downloadReportFromDialog(event) {
   event.preventDefault();
 
-  const reportText = buildReportText();
+  const report = buildReport();
+  const reportText = buildReportText(report);
   const blob = new Blob([reportText], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `timekeeper-report-${formatFileDate(new Date())}.txt`;
+  anchor.download = getReportFileName(report);
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
@@ -1385,8 +1386,9 @@ function emailReportFromDialog() {
   }
 
   const recipient = elements.reportEmailInput.value.trim();
-  const subject = `Timekeeper Report - ${formatFileDate(new Date())}`;
-  const body = buildReportText();
+  const report = buildReport();
+  const subject = `Timekeeper Report - ${report.startDate} to ${report.endDate}`;
+  const body = buildReportText(report);
   const mailtoUrl = `mailto:${encodeURIComponent(recipient)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
   window.location.href = mailtoUrl;
@@ -1425,6 +1427,8 @@ function buildReport() {
 
   return {
     rangeLabel: `${formatDateTime(reportStart)} - ${formatDateTime(reportEnd)}`,
+    startDate: formatFileDate(reportStart),
+    endDate: formatFileDate(reportEnd),
     totals,
     goals: buildGoalReportEntries(goalTotals, goalObjectives),
     timeline: timeline.sort((a, b) => a.sortTime - b.sortTime),
@@ -1443,8 +1447,7 @@ function buildGoalReportEntries(goalTotals, goalObjectives) {
     .sort((a, b) => b.durationMs - a.durationMs || a.rowIndex - b.rowIndex);
 }
 
-function buildReportText() {
-  const report = buildReport();
+function buildReportText(report = buildReport()) {
   const lines = [
     "Timekeeper Report",
     `Date range: ${report.rangeLabel}`,
@@ -1483,6 +1486,10 @@ function buildReportText() {
   }
 
   return `${lines.join("\n")}\n`;
+}
+
+function getReportFileName(report) {
+  return `timekeeper-report-${report.startDate}-to-${report.endDate}.txt`;
 }
 
 function normalizeBoard() {
