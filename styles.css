@@ -20,8 +20,8 @@
   --bucket-operations-line: #5b93c8;
   --bucket-projects: #ffebc2;
   --bucket-projects-line: #c99025;
-  --bucket-non-work: #ffe2ec;
-  --bucket-non-work-line: #c66b8a;
+  --bucket-break: #ffe2ec;
+  --bucket-break-line: #c66b8a;
   --shadow: 0 14px 32px rgba(31, 37, 40, 0.12);
 }
 
@@ -281,9 +281,9 @@ button {
   background: var(--bucket-projects);
 }
 
-.totals-grid [data-bucket="Non-work"] {
-  border-color: var(--bucket-non-work-line);
-  background: var(--bucket-non-work);
+.totals-grid [data-bucket="Break"] {
+  border-color: var(--bucket-break-line);
+  background: var(--bucket-break);
 }
 
 .totals-grid dt {
@@ -670,9 +670,9 @@ body.is-board-dragging * {
   background: var(--bucket-projects);
 }
 
-.bucket-select[data-bucket="Non-work"] {
-  border-color: var(--bucket-non-work-line);
-  background: var(--bucket-non-work);
+.bucket-select[data-bucket="Break"] {
+  border-color: var(--bucket-break-line);
+  background: var(--bucket-break);
 }
 
 .task-objective {

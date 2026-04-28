@@ -1,5 +1,5 @@
 const STORAGE_KEY = "timekeeper.tasks.v1";
-const BUCKETS = ["Admin", "Operations", "Projects", "Non-work"];
+const BUCKETS = ["Admin", "Operations", "Projects", "Break"];
 const DEFAULT_TIME_GOAL_MS = 8 * 60 * 60 * 1000;
 
 const state = {
@@ -39,7 +39,7 @@ function cacheElements() {
     Admin: document.getElementById("adminTotalTime"),
     Operations: document.getElementById("operationsTotalTime"),
     Projects: document.getElementById("projectsTotalTime"),
-    "Non-work": document.getElementById("nonWorkTotalTime"),
+    Break: document.getElementById("breakTotalTime"),
   };
   elements.goalTotals = document.getElementById("goalTotals");
   elements.generateReportButton = document.getElementById("generateReportButton");
@@ -278,7 +278,7 @@ function sanitizeTask(task) {
   }
 
   const status = task.status === "finished" ? "finished" : "active";
-  const bucket = BUCKETS.includes(task.bucket) ? task.bucket : "Admin";
+  const bucket = sanitizeBucket(task.bucket);
   const logs = Array.isArray(task.logs) ? task.logs.map(sanitizeLog).filter(Boolean) : [];
 
   return {
@@ -297,6 +297,14 @@ function sanitizeTask(task) {
 
 function sanitizeFinishNote(note) {
   return typeof note === "string" ? note.trim().slice(0, 1000) : "";
+}
+
+function sanitizeBucket(bucket) {
+  if (bucket === "Non-work") {
+    return "Break";
+  }
+
+  return BUCKETS.includes(bucket) ? bucket : "Admin";
 }
 
 function sanitizeLog(log) {

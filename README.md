@@ -6,7 +6,7 @@ Timekeeper is a lightweight browser-based time tracker for organizing a day of w
 
 ### Track Your Day
 
-Use the time pane at the top to set a daily time goal in hours and minutes. The app shows total elapsed time, remaining time, bucket totals for Admin, Operations, Projects, and Non-work, and goal totals for the day.
+Use the time pane at the top to set a daily time goal in hours and minutes. The app shows total elapsed time, remaining time, bucket totals for Admin, Operations, Projects, and Break, and goal totals for the day.
 
 When remaining time reaches zero, Timekeeper plays a chime.
 
@@ -31,7 +31,7 @@ Use **Add task** inside a goal to add work. Each task box has an objective and a
 - **Admin**: vacation, sick time, holidays, professional development, email, and meetings not tied to a project
 - **Operations**: service requests, incidents, existing responsibilities, break/fix work, and delivery support
 - **Projects**: temporary work with a start and end date that creates a unique service, product, or outcome
-- **Non-work**: breaks, meals, personal time, appointments, and other time outside work categories
+- **Break**: breaks, meals, personal time, appointments, and other time outside work categories
 
 The bucket dropdown is color coded. Drag task boxes within or across goals to reorganize the board.
 
