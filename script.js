@@ -2341,8 +2341,7 @@ function formatTimelineEntry(entry) {
   const timeRange = entry.start
     ? `${formatDateTime(entry.start)} - ${entry.end ? formatDateTime(entry.end) : "Running"}`
     : entry.label.replace(/\s+\(.+\)$/, "");
-  const notes = entry.notes.length > 0 ? ` | ${entry.notes.join("; ")}` : "";
-  return `${timeRange} (${formatDuration(entry.durationMs)}) | ${entry.objective}${formatUrgentReportLabel(entry)} | ${entry.bucket}${notes}`;
+  return `${timeRange} (${formatDuration(entry.durationMs)}) | ${entry.objective}${formatUrgentReportLabel(entry)} | ${entry.bucket}`;
 }
 
 function tick() {
