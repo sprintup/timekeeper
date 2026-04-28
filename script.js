@@ -45,6 +45,9 @@ function cacheElements() {
   elements.goalTotals = document.getElementById("goalTotals");
   elements.generateReportButton = document.getElementById("generateReportButton");
   elements.clearCompletedButton = document.getElementById("clearCompletedButton");
+  elements.exportDataButton = document.getElementById("exportDataButton");
+  elements.importDataButton = document.getElementById("importDataButton");
+  elements.importDataInput = document.getElementById("importDataInput");
   elements.resetStateButton = document.getElementById("resetStateButton");
 
   elements.taskDialog = document.getElementById("taskDialog");
@@ -96,6 +99,9 @@ function cacheElements() {
 function bindEvents() {
   elements.generateReportButton.addEventListener("click", openReportDialog);
   elements.clearCompletedButton.addEventListener("click", clearCompletedTasksWithPrompt);
+  elements.exportDataButton.addEventListener("click", exportData);
+  elements.importDataButton.addEventListener("click", () => elements.importDataInput.click());
+  elements.importDataInput.addEventListener("change", importDataFromFile);
   elements.resetStateButton.addEventListener("click", resetStateWithPrompt);
   elements.timeGoalForm.addEventListener("submit", saveTimeGoalFromForm);
   elements.clearTimeGoalButton.addEventListener("click", clearTimeGoal);
@@ -225,6 +231,10 @@ function handleDocumentClick(event) {
     openTimeLogDialog(taskId);
   }
 
+  if (action === "show-notes") {
+    openFinishNoteDialog(taskId);
+  }
+
   if (action === "edit-log") {
     openLogDialog(taskId, actionElement.dataset.logId);
   }
@@ -294,13 +304,121 @@ function loadState() {
 }
 
 function saveState() {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(getStateSnapshot()));
+}
+
+function getStateSnapshot() {
+  return {
     tasks: state.tasks,
     rows: state.rows,
     timeGoalMs: state.timeGoalMs,
     timeGoalCleared: state.timeGoalCleared,
     goalChimeKey: state.goalChimeKey,
-  }));
+  };
+}
+
+function exportData() {
+  saveState();
+  const payload = {
+    app: "timekeeper",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    data: getStateSnapshot(),
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+
+  anchor.href = url;
+  anchor.download = `timekeeper-data-${formatFileDate(new Date())}.json`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+function importDataFromFile(event) {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+
+  if (!file) {
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    importDataFromText(String(reader.result || ""));
+  });
+  reader.addEventListener("error", () => {
+    window.alert("Unable to read that import file.");
+  });
+  reader.readAsText(file);
+}
+
+function importDataFromText(text) {
+  let parsed = null;
+
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    window.alert("That file is not valid JSON.");
+    return;
+  }
+
+  const importedState = getImportState(parsed);
+  if (!importedState) {
+    window.alert("That JSON file does not look like Timekeeper export data.");
+    return;
+  }
+
+  const confirmed = window.confirm("Import this Timekeeper data? This will replace the tasks, goals, logs, and time goal saved in this browser.");
+  if (!confirmed) {
+    return;
+  }
+
+  applyImportedState(importedState);
+  window.alert("Timekeeper data imported.");
+}
+
+function getImportState(payload) {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const candidate = payload.data && typeof payload.data === "object" ? payload.data : payload;
+  return isImportableState(candidate) ? candidate : null;
+}
+
+function isImportableState(candidate) {
+  return Boolean(candidate)
+    && typeof candidate === "object"
+    && Array.isArray(candidate.tasks)
+    && Array.isArray(candidate.rows);
+}
+
+function applyImportedState(importedState) {
+  state.tasks = importedState.tasks.map(sanitizeTask).filter(Boolean);
+  state.rows = importedState.rows.map(sanitizeRow).filter(Boolean);
+  state.timeGoalCleared = importedState.timeGoalCleared === true;
+  state.timeGoalMs = state.timeGoalCleared
+    ? sanitizeTimeGoal(importedState.timeGoalMs)
+    : sanitizeTimeGoal(importedState.timeGoalMs, DEFAULT_TIME_GOAL_MS);
+  state.goalChimeKey = typeof importedState.goalChimeKey === "string" ? importedState.goalChimeKey : "";
+  previousGoalRemainingMs = null;
+  activeTimeLogTaskId = null;
+  activeFinishNoteTaskId = null;
+
+  setTimeGoalInputs(state.timeGoalMs);
+  normalizeBoard();
+  enforceSingleRunningLog();
+  saveState();
+  closeDialog(elements.taskDialog);
+  closeDialog(elements.rowDialog);
+  closeDialog(elements.timeLogDialog);
+  closeDialog(elements.logDialog);
+  closeDialog(elements.finishNoteDialog);
+  closeDialog(elements.reportDialog);
+  render();
 }
 
 function sanitizeTask(task) {
@@ -523,6 +641,7 @@ function createTaskCard(task) {
   const finished = fragment.querySelector(".finished-time");
   const toggleButton = fragment.querySelector('[data-action="toggle-timer"]');
   const timeLogButton = fragment.querySelector('[data-action="show-log"]');
+  const notesButton = fragment.querySelector('[data-action="show-notes"]');
 
   card.dataset.taskId = task.id;
   card.classList.toggle("is-running", isTaskRunning(task));
@@ -539,6 +658,7 @@ function createTaskCard(task) {
   finished.textContent = task.finishedAt ? formatTime(task.finishedAt) : "";
   toggleButton.textContent = isTaskRunning(task) ? "Pause" : "Start";
   timeLogButton.textContent = `Show time log (${task.logs.length})`;
+  notesButton.textContent = `Show notes (${task.finishNotes.length})`;
 
   return fragment;
 }

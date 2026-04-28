@@ -740,6 +740,10 @@ body.is-board-dragging * {
   margin-top: auto;
 }
 
+.time-log-button + .notes-button {
+  margin-top: 8px;
+}
+
 .task-actions {
   margin-top: 12px;
 }

@@ -39,7 +39,7 @@ The bucket dropdown is color coded. Drag task boxes within or across goals to re
 
 Click **Start** on a task box to begin timing, or use **Save and start** when creating a task. Starting another task pauses the current one. Click **Pause** to stop the active timer.
 
-Use **Show time log** to review, add, edit, or delete time entries for a task box.
+Use **Show time log** to review, add, edit, or delete time entries for a task box. Use **Show notes** to open the finish notes modal without finishing the task.
 
 Use **Finish** to mark a task complete and open the finish notes modal. Add, edit, or delete finish notes there; tasks with no notes appear in reports as `finished`. Press **Finish** again on a completed task to add or manage notes. Completed task boxes move to the end of their goal. Use **Clear completed tasks** to remove finished task boxes.
 
@@ -52,6 +52,10 @@ Click **Generate report** to preview the report for today. The report includes:
 - Timeline of worked time, listed at the bottom with finish notes at the end of each finished task entry
 
 You can download the report as a text file or open a prefilled email draft with the report content. The **Delete time logs after download** checkbox is checked by default when the report modal opens.
+
+### Moving Data
+
+Use **Export data** to download a JSON backup of the current goals, task boxes, time logs, finish notes, and time goal. On another computer or browser, use **Import data** and select that JSON file. Importing replaces the Timekeeper data saved in that browser.
 
 ### Reset
 
