@@ -102,6 +102,7 @@ function cacheElements() {
   elements.reportPreview = document.getElementById("reportPreview");
   elements.reportEmailInput = document.getElementById("reportEmailInput");
   elements.emailReportButton = document.getElementById("emailReportButton");
+  elements.copyReportButton = document.getElementById("copyReportButton");
   elements.deleteAfterReportInput = document.getElementById("deleteAfterReportInput");
 }
 
@@ -126,6 +127,7 @@ function bindEvents() {
   elements.finishNoteForm.addEventListener("submit", saveFinishNoteFromDialog);
   elements.reportForm.addEventListener("submit", downloadReportFromDialog);
   elements.emailReportButton.addEventListener("click", emailReportFromDialog);
+  elements.copyReportButton.addEventListener("click", copyReportFromDialog);
   elements.scrollTopButton.addEventListener("click", scrollToTop);
 
   document.addEventListener("click", handleDocumentClick);
@@ -2031,6 +2033,60 @@ function emailReportFromDialog() {
   const mailtoUrl = `mailto:${encodeURIComponent(recipient)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
   window.location.href = mailtoUrl;
+}
+
+async function copyReportFromDialog() {
+  const reportText = buildReportText(buildReport());
+
+  try {
+    await copyTextToClipboard(reportText);
+    showTemporaryButtonText(elements.copyReportButton, "Copied");
+  } catch (error) {
+    window.alert("Unable to copy the report to the clipboard.");
+  }
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard?.writeText && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  copyTextWithFallback(text);
+}
+
+function copyTextWithFallback(text) {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.top = "-9999px";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+
+  const copied = document.execCommand("copy");
+  textarea.remove();
+
+  if (!copied) {
+    throw new Error("Clipboard copy failed.");
+  }
+}
+
+function showTemporaryButtonText(button, text) {
+  const originalText = button.textContent;
+  button.textContent = text;
+  button.disabled = true;
+
+  window.setTimeout(() => {
+    if (!button.isConnected) {
+      return;
+    }
+
+    button.textContent = originalText;
+    button.disabled = false;
+  }, 1400);
 }
 
 function buildReport() {

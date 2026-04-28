@@ -54,7 +54,7 @@ Click **Generate report** to preview the report for today. The report includes:
 - Timeline of worked dates and times, listed at the bottom with task, elapsed time, bucket, and urgent markers
 - Exported JSON data below the timeline
 
-You can download the report as a text file or open a prefilled email draft with the report content. The **Delete time logs after download** checkbox is checked by default when the report modal opens.
+You can download the report as a text file, copy it to the clipboard, or open a prefilled email draft with the report content. The **Delete time logs after download** checkbox is checked by default when the report modal opens.
 
 ### Moving Data
 
