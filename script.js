@@ -746,7 +746,7 @@ function renderFinishNoteModal() {
   if (task.finishNotes.length === 0) {
     const empty = document.createElement("p");
     empty.className = "empty-log";
-    empty.textContent = 'No finish notes. Reports will show "finished".';
+    empty.textContent = 'No notes yet. Finished tasks without notes will show "finished" in reports.';
     elements.finishNoteList.appendChild(empty);
     return;
   }
@@ -806,6 +806,7 @@ function handleTaskPointerDown(event) {
     type: "task",
     card,
     fromRowIndex: Number(card.closest(".task-row")?.dataset.rowIndex),
+    wasRunning: isTaskRunning(findTask(card.dataset.taskId)),
     handle: event.currentTarget,
     pointerId: event.pointerId,
   };
@@ -860,8 +861,9 @@ function handleBoardPointerUp() {
   if (activeDrag.type === "task") {
     const fromRowIndex = activeDrag.fromRowIndex;
     const destinationRowIndex = Number(activeDrag.card.closest(".task-track")?.dataset.rowIndex);
+    const wasRunning = activeDrag.wasRunning;
     syncOrderFromDom();
-    promoteDestinationGoalIfNeeded(fromRowIndex, destinationRowIndex);
+    promoteDestinationGoalIfNeeded(fromRowIndex, destinationRowIndex, wasRunning);
     cancelActiveDrag();
     render();
     return;
@@ -989,7 +991,11 @@ function syncOrderFromDom() {
   saveState();
 }
 
-function promoteDestinationGoalIfNeeded(fromRowIndex, destinationRowIndex) {
+function promoteDestinationGoalIfNeeded(fromRowIndex, destinationRowIndex, shouldPromote) {
+  if (!shouldPromote) {
+    return;
+  }
+
   if (!Number.isInteger(fromRowIndex) || !Number.isInteger(destinationRowIndex)) {
     return;
   }
@@ -1246,7 +1252,7 @@ function saveFinishNoteFromDialog(event) {
 
   const noteText = sanitizeFinishNote(elements.finishNoteInput.value);
   if (!noteText) {
-    window.alert('Enter a note, or close the modal to use "finished" in reports.');
+    window.alert("Enter a note, or close the modal without saving.");
     return;
   }
 
@@ -1344,7 +1350,6 @@ function startTask(task) {
   promoteTaskUrgency(task);
   task.status = "active";
   task.finishedAt = null;
-  task.finishNotes = [];
   task.logs.push({
     id: createId(),
     start: now.toISOString(),
@@ -1408,7 +1413,6 @@ function restartTask(taskId) {
 
   task.status = "active";
   task.finishedAt = null;
-  task.finishNotes = [];
   saveState();
   render();
 }
@@ -1462,7 +1466,7 @@ function deleteFinishNote(taskId, noteId) {
     return;
   }
 
-  const confirmed = window.confirm("Delete this finish note?");
+  const confirmed = window.confirm("Delete this note?");
   if (!confirmed) {
     return;
   }
@@ -1782,7 +1786,7 @@ function buildReport() {
         objective: task.objective,
         bucket: task.bucket,
         durationMs,
-        notes: getTaskFinishMessages(task),
+        notes: getTaskReportNotes(task),
         logs: logEntries,
       });
       goalObjectives.set(task.row, objectives);
@@ -1973,21 +1977,21 @@ function createReportLogEntry(log, task, reportStart, reportEnd) {
     start: logWindow.start,
     end: logWindow.end,
     sortTime: logWindow.sortTime,
-    notes: getTaskFinishMessages(task),
+    notes: getTaskReportNotes(task),
     label: formatReportLogLabel(log, durationMs, reportStart, reportEnd),
   };
 }
 
-function getTaskFinishMessages(task) {
-  if (task.status !== "finished" && !task.finishedAt) {
-    return [];
-  }
-
+function getTaskReportNotes(task) {
   const notes = Array.isArray(task.finishNotes)
     ? task.finishNotes.map((note) => note.text).filter(Boolean)
     : [];
 
-  return notes.length > 0 ? notes : ["finished"];
+  if (notes.length > 0) {
+    return notes;
+  }
+
+  return task.status === "finished" || task.finishedAt ? ["finished"] : [];
 }
 
 function getLogDurationWithinRange(log, reportStart, reportEnd) {
