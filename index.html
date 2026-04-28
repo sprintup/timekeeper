@@ -9,6 +9,34 @@
   </head>
   <body>
     <div class="app-shell">
+      <section class="top-control-panel">
+        <details class="instructions-panel">
+          <summary>Instructions</summary>
+          <div class="instructions-content">
+            <ol>
+              <li>Set a time goal, then use the remaining-time countdown to track progress against the day.</li>
+              <li>Add named goals for groups of work, then use Add task inside each goal. Rename or delete goals from the goal label.</li>
+              <li>Start one task at a time. Starting another task pauses the active timer and moves the task to the left of its goal.</li>
+              <li>Use Urgent on a task tile to add a red border and show the urgent flag below the goal totals.</li>
+              <li>Use the drag handles to rearrange goals vertically or task boxes within and across goals.</li>
+              <li>Open Show time log to add, edit, or nudge entries. Generate reports, or use Export and Import to move the full board between browsers.</li>
+            </ol>
+          </div>
+        </details>
+        <div class="header-actions actions-panel" aria-label="Report actions">
+          <button class="button button-primary" id="generateReportButton" type="button">Generate report</button>
+          <button class="button button-secondary" id="clearCompletedButton" type="button">Hide Finished</button>
+          <button class="button button-secondary" id="exportDataButton" type="button">Export</button>
+          <button class="button button-secondary" id="importDataButton" type="button">Import</button>
+          <input id="importDataInput" type="file" accept="application/json,.json" hidden>
+          <button class="button button-danger" id="resetStateButton" type="button">Reset</button>
+          <a class="icon-button github-page-link" id="githubPageLink" href="https://github.com/sprintup/timekeeper" target="_blank" rel="noreferrer" aria-label="Open GitHub repository" title="GitHub repository">
+            <svg aria-hidden="true" viewBox="0 0 16 16" width="20" height="20">
+              <path d="M8 0C3.58 0 0 3.67 0 8.2c0 3.62 2.29 6.69 5.47 7.78.4.08.55-.18.55-.4v-1.4c-2.23.5-2.7-1.1-2.7-1.1-.36-.95-.89-1.2-.89-1.2-.73-.51.06-.5.06-.5.8.06 1.22.85 1.22.85.72 1.25 1.87.89 2.33.68.07-.53.28-.89.5-1.09-1.78-.21-3.64-.91-3.64-4.05 0-.9.31-1.63.82-2.2-.08-.21-.36-1.05.08-2.18 0 0 .67-.22 2.2.84A7.4 7.4 0 0 1 8 3.96c.68 0 1.36.09 2 .27 1.53-1.06 2.2-.84 2.2-.84.44 1.13.16 1.97.08 2.18.51.57.82 1.3.82 2.2 0 3.15-1.87 3.84-3.65 4.04.29.25.54.76.54 1.54v2.28c0 .22.15.48.55.4A8.1 8.1 0 0 0 16 8.2C16 3.67 12.42 0 8 0Z"></path>
+            </svg>
+          </a>
+        </div>
+      </section>
       <header class="app-header">
         <section class="totals-panel" aria-labelledby="totalsTitle">
           <h2 class="visually-hidden" id="totalsTitle">Time totals</h2>
@@ -16,6 +44,10 @@
             <div class="time-meter">
               <span>Total Elapsed Time</span>
               <strong id="todayTotalTime">0h 00m 00s</strong>
+            </div>
+            <div class="time-meter">
+              <span>Total Work Time</span>
+              <strong id="todayWorkTime">0h 00m 00s</strong>
             </div>
             <label class="time-goal-field">
               <span>Goal Hours</span>
@@ -45,50 +77,20 @@
               <dt>Projects</dt>
               <dd id="projectsTotalTime">0h 00m 00s</dd>
             </div>
-            <div data-bucket="Break">
-              <dt>Break</dt>
-              <dd id="breakTotalTime">0h 00m 00s</dd>
+            <div data-bucket="Personal">
+              <dt>Personal</dt>
+              <dd id="personalTotalTime">0h 00m 00s</dd>
             </div>
           </dl>
+          <section class="goal-breakdown" aria-label="Goal totals">
+            <div class="goal-totals" id="goalTotals"></div>
+          </section>
           <div class="urgent-indicator" id="urgentIndicator" hidden>
             <span class="urgent-flag" aria-hidden="true"></span>
             <span id="urgentIndicatorText">Urgent tasks</span>
           </div>
-          <section class="goal-breakdown" aria-labelledby="goalBreakdownTitle">
-            <h3 id="goalBreakdownTitle">Goal breakdown</h3>
-            <div class="goal-totals" id="goalTotals"></div>
-          </section>
         </section>
       </header>
-
-      <section class="top-control-panel">
-        <details class="instructions-panel">
-          <summary>Instructions</summary>
-          <div class="instructions-content">
-            <ol>
-              <li>Set a time goal, then use the remaining-time countdown to track progress against the day.</li>
-              <li>Add named goals for groups of work, then use Add task inside each goal. Rename or delete goals from the goal label.</li>
-              <li>Start one task at a time. Starting another task pauses the active timer, promotes that task's goal to Priority 1, and moves the task to the left of that goal.</li>
-              <li>Use Urgent on a task tile to add a red border and show the urgent flag above the goal breakdown.</li>
-              <li>Use the drag handles to rearrange goals vertically or task boxes within and across goals.</li>
-              <li>Open Show time log to add, edit, or delete entries. Generate reports, or use Export data and Import data to move the full board between browsers.</li>
-            </ol>
-          </div>
-        </details>
-        <div class="header-actions actions-panel" aria-label="Report actions">
-          <button class="button button-primary" id="generateReportButton" type="button">Generate report</button>
-          <button class="button button-secondary" id="clearCompletedButton" type="button">Clear completed tasks</button>
-          <button class="button button-secondary" id="exportDataButton" type="button">Export data</button>
-          <button class="button button-secondary" id="importDataButton" type="button">Import data</button>
-          <input id="importDataInput" type="file" accept="application/json,.json" hidden>
-          <button class="button button-danger" id="resetStateButton" type="button">Reset</button>
-          <a class="icon-button github-page-link" id="githubPageLink" href="https://github.com/sprintup/timekeeper" target="_blank" rel="noreferrer" aria-label="Open GitHub repository" title="GitHub repository">
-            <svg aria-hidden="true" viewBox="0 0 16 16" width="20" height="20">
-              <path d="M8 0C3.58 0 0 3.67 0 8.2c0 3.62 2.29 6.69 5.47 7.78.4.08.55-.18.55-.4v-1.4c-2.23.5-2.7-1.1-2.7-1.1-.36-.95-.89-1.2-.89-1.2-.73-.51.06-.5.06-.5.8.06 1.22.85 1.22.85.72 1.25 1.87.89 2.33.68.07-.53.28-.89.5-1.09-1.78-.21-3.64-.91-3.64-4.05 0-.9.31-1.63.82-2.2-.08-.21-.36-1.05.08-2.18 0 0 .67-.22 2.2.84A7.4 7.4 0 0 1 8 3.96c.68 0 1.36.09 2 .27 1.53-1.06 2.2-.84 2.2-.84.44 1.13.16 1.97.08 2.18.51.57.82 1.3.82 2.2 0 3.15-1.87 3.84-3.65 4.04.29.25.54.76.54 1.54v2.28c0 .22.15.48.55.4A8.1 8.1 0 0 0 16 8.2C16 3.67 12.42 0 8 0Z"></path>
-            </svg>
-          </a>
-        </div>
-      </section>
       <div class="top-divider" aria-hidden="true"></div>
 
       <main class="workspace">
@@ -107,7 +109,7 @@
             <option>Admin</option>
             <option>Operations</option>
             <option>Projects</option>
-            <option>Break</option>
+            <option>Personal</option>
           </select>
           <button class="icon-button" data-action="edit-task" type="button" aria-label="Edit task">Edit</button>
         </div>
@@ -133,7 +135,6 @@
           <button class="button button-small button-urgent" data-action="toggle-urgent" type="button">Urgent</button>
           <button class="button button-small" data-action="finish-task" type="button">Finish</button>
           <button class="button button-small button-restart" data-action="restart-task" type="button">Restart</button>
-          <button class="button button-small button-danger" data-action="delete-task" type="button">Delete</button>
         </div>
       </article>
     </template>
@@ -154,10 +155,11 @@
         <label class="field">
           <span>Bucket</span>
           <select id="bucketInput" required>
+            <option value="" disabled selected>Select bucket</option>
             <option>Admin</option>
             <option>Operations</option>
             <option>Projects</option>
-            <option>Break</option>
+            <option>Personal</option>
           </select>
         </label>
         <details class="category-helper" id="taskCategoryGuide">
@@ -176,13 +178,14 @@
               <p>Temporary work with a start and end date that creates a unique service, product, or outcome.</p>
             </section>
             <section>
-              <h3>Break</h3>
+              <h3>Personal</h3>
               <p>Breaks, meals, personal time, appointments, and other time outside work categories.</p>
             </section>
           </div>
         </details>
         <div class="modal-actions">
           <button class="button button-secondary" type="button" data-action="close-task-dialog">Cancel</button>
+          <button class="button button-danger" id="deleteTaskDialogButton" type="button" data-action="delete-task-from-dialog" hidden>Delete</button>
           <button class="button button-secondary" type="submit" value="save">Save</button>
           <button class="button button-primary" type="submit" value="save-start">Save and start</button>
         </div>
@@ -233,7 +236,7 @@
           </div>
           <button class="icon-button" value="cancel" type="button" data-action="close-finish-note-dialog" aria-label="Close">Close</button>
         </div>
-        <div class="time-log-list" id="finishNoteList"></div>
+        <div class="time-log-list notes-list" id="finishNoteList"></div>
         <form class="finish-note-form" id="finishNoteForm" method="dialog">
           <input id="finishNoteTaskIdInput" type="hidden">
           <input id="finishNoteIdInput" type="hidden">
@@ -274,7 +277,7 @@
         </label>
         <div class="modal-actions">
           <button class="button button-secondary" type="button" data-action="close-log-dialog">Cancel</button>
-          <button class="button button-primary" type="submit">Add</button>
+          <button class="button button-primary" type="submit">Save</button>
         </div>
       </form>
     </dialog>

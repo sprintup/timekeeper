@@ -1,5 +1,5 @@
 const STORAGE_KEY = "timekeeper.tasks.v1";
-const BUCKETS = ["Admin", "Operations", "Projects", "Break"];
+const BUCKETS = ["Admin", "Operations", "Projects", "Personal"];
 const DEFAULT_TIME_GOAL_MS = 8 * 60 * 60 * 1000;
 const LOG_ADJUSTMENT_MS = 60 * 1000;
 
@@ -9,6 +9,7 @@ const state = {
   timeGoalMs: DEFAULT_TIME_GOAL_MS,
   timeGoalCleared: false,
   goalChimeKey: "",
+  hideFinished: false,
 };
 
 const elements = {};
@@ -32,16 +33,18 @@ function cacheElements() {
   elements.todayDate = document.getElementById("todayDate");
   elements.taskTemplate = document.getElementById("taskCardTemplate");
   elements.todayTotalTime = document.getElementById("todayTotalTime");
+  elements.todayWorkTime = document.getElementById("todayWorkTime");
   elements.timeGoalForm = document.getElementById("timeGoalForm");
   elements.timeGoalHoursInput = document.getElementById("timeGoalHoursInput");
   elements.timeGoalMinutesInput = document.getElementById("timeGoalMinutesInput");
   elements.clearTimeGoalButton = document.getElementById("clearTimeGoalButton");
   elements.timeGoalRemaining = document.getElementById("timeGoalRemaining");
+  elements.todayTotals = document.getElementById("todayTotals");
   elements.bucketTotalElements = {
     Admin: document.getElementById("adminTotalTime"),
     Operations: document.getElementById("operationsTotalTime"),
     Projects: document.getElementById("projectsTotalTime"),
-    Break: document.getElementById("breakTotalTime"),
+    Personal: document.getElementById("personalTotalTime"),
   };
   elements.goalTotals = document.getElementById("goalTotals");
   elements.urgentIndicator = document.getElementById("urgentIndicator");
@@ -62,6 +65,7 @@ function cacheElements() {
   elements.objectiveInput = document.getElementById("objectiveInput");
   elements.bucketInput = document.getElementById("bucketInput");
   elements.taskCategoryGuide = document.getElementById("taskCategoryGuide");
+  elements.deleteTaskDialogButton = document.getElementById("deleteTaskDialogButton");
 
   elements.rowDialog = document.getElementById("rowDialog");
   elements.rowForm = document.getElementById("rowForm");
@@ -101,7 +105,7 @@ function cacheElements() {
 
 function bindEvents() {
   elements.generateReportButton.addEventListener("click", openReportDialog);
-  elements.clearCompletedButton.addEventListener("click", clearCompletedTasksWithPrompt);
+  elements.clearCompletedButton.addEventListener("click", toggleHideFinished);
   elements.exportDataButton.addEventListener("click", exportData);
   elements.importDataButton.addEventListener("click", () => elements.importDataInput.click());
   elements.importDataInput.addEventListener("change", importDataFromFile);
@@ -111,6 +115,12 @@ function bindEvents() {
   elements.taskForm.addEventListener("submit", saveTaskFromDialog);
   elements.rowForm.addEventListener("submit", saveRowFromDialog);
   elements.logForm.addEventListener("submit", saveManualLogFromDialog);
+  elements.logStartInput.addEventListener("input", syncLogFieldsFromStart);
+  elements.logStartInput.addEventListener("change", syncLogFieldsFromStart);
+  elements.logEndInput.addEventListener("input", syncLogFieldsFromEnd);
+  elements.logEndInput.addEventListener("change", syncLogFieldsFromEnd);
+  elements.manualMinutesInput.addEventListener("input", syncLogFieldsFromMinutes);
+  elements.manualMinutesInput.addEventListener("change", syncLogFieldsFromMinutes);
   elements.finishNoteForm.addEventListener("submit", saveFinishNoteFromDialog);
   elements.reportForm.addEventListener("submit", downloadReportFromDialog);
   elements.emailReportButton.addEventListener("click", emailReportFromDialog);
@@ -181,6 +191,19 @@ function handleDocumentClick(event) {
     return;
   }
 
+  if (action === "delete-task-from-dialog") {
+    const taskIdToDelete = elements.taskIdInput.value;
+    if (taskIdToDelete && deleteTask(taskIdToDelete)) {
+      closeDialog(elements.taskDialog);
+    }
+    return;
+  }
+
+  if (action === "scroll-to-row") {
+    scrollToRow(Number(actionElement.dataset.rowIndex));
+    return;
+  }
+
   if (action === "add-side-quest") {
     openTaskDialog("add", "side", null, Number(actionElement.dataset.rowIndex));
     return;
@@ -246,12 +269,8 @@ function handleDocumentClick(event) {
     openLogDialog(taskId, actionElement.dataset.logId);
   }
 
-  if (action === "extend-log-start") {
-    extendLogStart(taskId, actionElement.dataset.logId);
-  }
-
-  if (action === "extend-log-end") {
-    extendLogEnd(taskId, actionElement.dataset.logId);
+  if (action === "adjust-log-time") {
+    adjustLogTime(taskId, actionElement.dataset.logId, actionElement.dataset.edge, Number(actionElement.dataset.delta));
   }
 
   if (action === "delete-log") {
@@ -292,6 +311,7 @@ function loadState() {
     state.timeGoalMs = DEFAULT_TIME_GOAL_MS;
     state.timeGoalCleared = false;
     state.goalChimeKey = "";
+    state.hideFinished = false;
     setTimeGoalInputs(state.timeGoalMs);
     return;
   }
@@ -303,6 +323,7 @@ function loadState() {
     state.timeGoalCleared = parsed.timeGoalCleared === true;
     state.timeGoalMs = state.timeGoalCleared ? sanitizeTimeGoal(parsed.timeGoalMs) : sanitizeTimeGoal(parsed.timeGoalMs, DEFAULT_TIME_GOAL_MS);
     state.goalChimeKey = typeof parsed.goalChimeKey === "string" ? parsed.goalChimeKey : "";
+    state.hideFinished = parsed.hideFinished === true;
     setTimeGoalInputs(state.timeGoalMs);
     normalizeBoard();
     enforceSingleRunningLog();
@@ -314,6 +335,7 @@ function loadState() {
     state.timeGoalMs = DEFAULT_TIME_GOAL_MS;
     state.timeGoalCleared = false;
     state.goalChimeKey = "";
+    state.hideFinished = false;
     setTimeGoalInputs(state.timeGoalMs);
   }
 }
@@ -329,17 +351,22 @@ function getStateSnapshot() {
     timeGoalMs: state.timeGoalMs,
     timeGoalCleared: state.timeGoalCleared,
     goalChimeKey: state.goalChimeKey,
+    hideFinished: state.hideFinished,
+  };
+}
+
+function createExportPayload(exportedAt = new Date()) {
+  return {
+    app: "timekeeper",
+    version: 1,
+    exportedAt: exportedAt.toISOString(),
+    data: getStateSnapshot(),
   };
 }
 
 function exportData() {
   saveState();
-  const payload = {
-    app: "timekeeper",
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    data: getStateSnapshot(),
-  };
+  const payload = createExportPayload();
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -419,6 +446,7 @@ function applyImportedState(importedState) {
     ? sanitizeTimeGoal(importedState.timeGoalMs)
     : sanitizeTimeGoal(importedState.timeGoalMs, DEFAULT_TIME_GOAL_MS);
   state.goalChimeKey = typeof importedState.goalChimeKey === "string" ? importedState.goalChimeKey : "";
+  state.hideFinished = importedState.hideFinished === true;
   previousGoalRemainingMs = null;
   activeTimeLogTaskId = null;
   activeFinishNoteTaskId = null;
@@ -455,7 +483,7 @@ function sanitizeTask(task) {
     order: clampInteger(task.order, 0),
     createdAt: task.createdAt || new Date().toISOString(),
     finishedAt: task.finishedAt || null,
-    urgent: task.urgent === true,
+    urgent: status === "finished" ? false : task.urgent === true,
     finishNotes,
     logs,
   };
@@ -498,8 +526,8 @@ function sanitizeFinishNoteEntry(note) {
 }
 
 function sanitizeBucket(bucket) {
-  if (bucket === "Non-work") {
-    return "Break";
+  if (bucket === "Non-work" || bucket === "Break") {
+    return "Personal";
   }
 
   return BUCKETS.includes(bucket) ? bucket : "Admin";
@@ -552,6 +580,7 @@ function sanitizeTimeGoal(value, fallback = 0) {
 
 function render() {
   normalizeBoard();
+  elements.clearCompletedButton.textContent = state.hideFinished ? "Show Finished" : "Hide Finished";
   elements.board.innerHTML = "";
 
   const rows = getRows();
@@ -584,7 +613,7 @@ function render() {
     track.dataset.rowIndex = String(rowIndex);
 
     const activeTasks = tasks.filter((task) => task.status !== "finished");
-    const completedTasks = tasks.filter((task) => task.status === "finished");
+    const completedTasks = state.hideFinished ? [] : tasks.filter((task) => task.status === "finished");
 
     activeTasks.forEach((task) => {
       track.appendChild(createTaskCard(task));
@@ -715,26 +744,9 @@ function renderTimeLogModal() {
     actions.className = "log-actions";
 
     if (!log.manual && log.start) {
-      const plusButton = document.createElement("button");
-      plusButton.className = "icon-button log-adjust-button";
-      plusButton.dataset.action = "extend-log-start";
-      plusButton.dataset.logId = log.id;
-      plusButton.type = "button";
-      plusButton.title = "Move start time 1 minute earlier";
-      plusButton.setAttribute("aria-label", "Move start time 1 minute earlier");
-      plusButton.textContent = "+";
-      actions.appendChild(plusButton);
-
+      actions.appendChild(createLogAdjustGroup("Start", log.id, "start", true));
       if (log.end) {
-        const minusButton = document.createElement("button");
-        minusButton.className = "icon-button log-adjust-button";
-        minusButton.dataset.action = "extend-log-end";
-        minusButton.dataset.logId = log.id;
-        minusButton.type = "button";
-        minusButton.title = "Move stop time 1 minute later";
-        minusButton.setAttribute("aria-label", "Move stop time 1 minute later");
-        minusButton.textContent = "-";
-        actions.appendChild(minusButton);
+        actions.appendChild(createLogAdjustGroup("End", log.id, "end", true));
       }
     }
 
@@ -756,6 +768,37 @@ function renderTimeLogModal() {
     item.append(details, actions);
     elements.timeLogList.appendChild(item);
   });
+}
+
+function createLogAdjustGroup(labelText, logId, edge, canIncrease) {
+  const group = document.createElement("div");
+  group.className = "log-adjust-group";
+
+  const label = document.createElement("span");
+  label.textContent = labelText;
+  group.appendChild(label);
+
+  group.appendChild(createLogAdjustButton(logId, edge, -1, `${labelText} -1 minute`));
+
+  if (canIncrease) {
+    group.appendChild(createLogAdjustButton(logId, edge, 1, `${labelText} +1 minute`));
+  }
+
+  return group;
+}
+
+function createLogAdjustButton(logId, edge, delta, label) {
+  const button = document.createElement("button");
+  button.className = "icon-button log-adjust-button";
+  button.dataset.action = "adjust-log-time";
+  button.dataset.logId = logId;
+  button.dataset.edge = edge;
+  button.dataset.delta = String(delta);
+  button.type = "button";
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  button.textContent = delta > 0 ? "+" : "-";
+  return button;
 }
 
 function openFinishNoteDialog(taskId, noteId = "") {
@@ -1119,7 +1162,8 @@ function openTaskDialog(mode, placement, task = null, rowIndex = "") {
   elements.taskPlacementInput.value = placement;
   elements.taskRowInput.value = task ? String(task.row) : rowIndex === "" ? "" : String(rowIndex);
   elements.objectiveInput.value = task?.objective || "";
-  elements.bucketInput.value = task?.bucket || (placement === "side" ? "Operations" : "Projects");
+  elements.bucketInput.value = task?.bucket || "";
+  elements.deleteTaskDialogButton.hidden = mode !== "edit" || !task;
   elements.taskCategoryGuide.hidden = placement !== "side";
   elements.taskCategoryGuide.open = placement === "side";
   openDialog(elements.taskDialog);
@@ -1217,7 +1261,7 @@ function openLogDialog(taskId, logId = "") {
   elements.logIdInput.value = log?.id || "";
   elements.logStartInput.value = log?.start ? toDateTimeLocalValue(log.start) : "";
   elements.logEndInput.value = log?.end ? toDateTimeLocalValue(log.end) : "";
-  elements.manualMinutesInput.value = log && !isLogRunning(log) ? minutesFromMs(getLogDuration(log)).toFixed(2) : "";
+  elements.manualMinutesInput.value = getLogDialogMinutesValue(log);
   openDialog(elements.logDialog);
   if (log?.start) {
     elements.logStartInput.focus();
@@ -1301,16 +1345,157 @@ function saveFinishNoteFromDialog(event) {
   elements.finishNoteInput.focus();
 }
 
+function syncLogFieldsFromStart() {
+  const start = getLogInputDate(elements.logStartInput);
+  if (!start) {
+    return;
+  }
+
+  const end = getLogInputDate(elements.logEndInput);
+  if (end && end >= start) {
+    setManualMinutesFromRange(start, end);
+    return;
+  }
+
+  setLogEndFromStartAndMinutes(start);
+}
+
+function syncLogFieldsFromEnd() {
+  const end = getLogInputDate(elements.logEndInput);
+  if (!end) {
+    return;
+  }
+
+  const start = getLogInputDate(elements.logStartInput);
+  if (start && end >= start) {
+    setManualMinutesFromRange(start, end);
+    return;
+  }
+
+  setLogStartFromEndAndMinutes(end);
+}
+
+function syncLogFieldsFromMinutes() {
+  const minutes = getManualMinutesInputValue();
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return;
+  }
+
+  const start = getLogInputDate(elements.logStartInput);
+  if (start) {
+    setLogEndFromStartAndMinutes(start);
+    return;
+  }
+
+  const end = getLogInputDate(elements.logEndInput);
+  if (end) {
+    setLogStartFromEndAndMinutes(end);
+  }
+}
+
+function getLogDialogMinutesValue(log) {
+  if (!log || isLogRunning(log)) {
+    return "";
+  }
+
+  const start = getLogInputDate(elements.logStartInput);
+  const end = getLogInputDate(elements.logEndInput);
+  if (start && end && end >= start) {
+    return minutesFromMs(end.getTime() - start.getTime()).toFixed(2);
+  }
+
+  return minutesFromMs(getLogDuration(log)).toFixed(2);
+}
+
+function getLogInputDate(input) {
+  if (!input.value) {
+    return null;
+  }
+
+  const date = new Date(input.value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function setLogEndFromStartAndMinutes(start) {
+  const minutes = getManualMinutesInputValue();
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return;
+  }
+
+  elements.logEndInput.value = toDateTimeLocalValue(new Date(start.getTime() + Math.round(minutes * 60 * 1000)));
+}
+
+function setLogStartFromEndAndMinutes(end) {
+  const minutes = getManualMinutesInputValue();
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    return;
+  }
+
+  elements.logStartInput.value = toDateTimeLocalValue(new Date(end.getTime() - Math.round(minutes * 60 * 1000)));
+}
+
+function setManualMinutesFromRange(start, end) {
+  elements.manualMinutesInput.value = minutesFromMs(end.getTime() - start.getTime()).toFixed(2);
+}
+
+function getManualMinutesInputValue() {
+  return Number(elements.manualMinutesInput.value);
+}
+
 function buildLogDraft({ existingLog, startValue, endValue, minutes }) {
   const now = new Date();
   const durationMs = Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes * 60 * 1000) : 0;
 
-  if (!startValue) {
-    if (durationMs <= 0) {
-      window.alert("Enter an amount of time, or add a start time.");
+  const start = startValue ? new Date(startValue) : null;
+  if (startValue && Number.isNaN(start.getTime())) {
+    window.alert("Enter a valid start time.");
+    return null;
+  }
+
+  const end = endValue ? new Date(endValue) : null;
+  if (endValue && Number.isNaN(end.getTime())) {
+    window.alert("Enter a valid stop time.");
+    return null;
+  }
+
+  if (start && end) {
+    if (end < start) {
+      window.alert("Enter a stop time after the start time.");
       return null;
     }
 
+    return {
+      start: start.toISOString(),
+      end: end.toISOString(),
+      durationMs: end.getTime() - start.getTime(),
+      manual: false,
+      createdAt: existingLog?.createdAt || start.toISOString(),
+    };
+  }
+
+  if (start && durationMs > 0) {
+    const calculatedEnd = new Date(start.getTime() + durationMs);
+    return {
+      start: start.toISOString(),
+      end: calculatedEnd.toISOString(),
+      durationMs,
+      manual: false,
+      createdAt: existingLog?.createdAt || start.toISOString(),
+    };
+  }
+
+  if (end && durationMs > 0) {
+    const calculatedStart = new Date(end.getTime() - durationMs);
+    return {
+      start: calculatedStart.toISOString(),
+      end: end.toISOString(),
+      durationMs,
+      manual: false,
+      createdAt: existingLog?.createdAt || calculatedStart.toISOString(),
+    };
+  }
+
+  if (durationMs > 0) {
     return {
       start: null,
       end: null,
@@ -1320,30 +1505,23 @@ function buildLogDraft({ existingLog, startValue, endValue, minutes }) {
     };
   }
 
-  const start = new Date(startValue);
-  if (Number.isNaN(start.getTime())) {
-    window.alert("Enter a valid start time.");
+  if (start) {
+    return {
+      start: start.toISOString(),
+      end: null,
+      durationMs: 0,
+      manual: false,
+      createdAt: existingLog?.createdAt || start.toISOString(),
+    };
+  }
+
+  if (end) {
+    window.alert("Enter an amount of time with the stop time, or add a start time.");
     return null;
   }
 
-  let end = null;
-  if (endValue) {
-    end = new Date(endValue);
-    if (Number.isNaN(end.getTime()) || end < start) {
-      window.alert("Enter a stop time after the start time.");
-      return null;
-    }
-  } else if (durationMs > 0) {
-    end = new Date(start.getTime() + durationMs);
-  }
-
-  return {
-    start: start.toISOString(),
-    end: end ? end.toISOString() : null,
-    durationMs: end ? Math.max(0, end.getTime() - start.getTime()) : 0,
-    manual: false,
-    createdAt: existingLog?.createdAt || start.toISOString(),
-  };
+  window.alert("Enter an amount of time, or add a start time.");
+  return null;
 }
 
 function toggleTimer(taskId) {
@@ -1364,11 +1542,12 @@ function toggleTimer(taskId) {
 
 function toggleUrgent(taskId) {
   const task = findTask(taskId);
-  if (!task) {
+  if (!task || task.status === "finished") {
     return;
   }
 
   task.urgent = !task.urgent;
+  normalizeBoard();
   saveState();
   render();
 }
@@ -1381,7 +1560,6 @@ function startTask(task) {
     }
   });
 
-  promoteTaskGoalIfNeeded(task);
   promoteTaskUrgency(task);
   task.status = "active";
   task.finishedAt = null;
@@ -1433,6 +1611,7 @@ function finishTask(taskId) {
     pauseTask(task, now);
     task.status = "finished";
     task.finishedAt = now.toISOString();
+    task.urgent = false;
   }
   normalizeBoard();
   saveState();
@@ -1455,12 +1634,12 @@ function restartTask(taskId) {
 function deleteTask(taskId) {
   const task = findTask(taskId);
   if (!task) {
-    return;
+    return false;
   }
 
   const confirmed = window.confirm(`Delete "${task.objective}"?`);
   if (!confirmed) {
-    return;
+    return false;
   }
 
   state.tasks = state.tasks.filter((candidate) => candidate.id !== taskId);
@@ -1479,6 +1658,7 @@ function deleteTask(taskId) {
   }
 
   render();
+  return true;
 }
 
 function deleteLog(taskId, logId) {
@@ -1495,35 +1675,38 @@ function deleteLog(taskId, logId) {
   render();
 }
 
-function extendLogStart(taskId, logId) {
+function adjustLogTime(taskId, logId, edge, deltaMinutes) {
   const log = findLog(taskId, logId);
-  if (!log || log.manual || !log.start) {
+  if (!log || log.manual || !log.start || !["start", "end"].includes(edge) || !Number.isFinite(deltaMinutes)) {
     return;
   }
 
-  const start = new Date(log.start);
-  if (Number.isNaN(start.getTime())) {
+  if (edge === "end" && !log.end) {
     return;
   }
 
-  log.start = new Date(start.getTime() - LOG_ADJUSTMENT_MS).toISOString();
-  updateTimedLogDuration(log);
-  saveState();
-  refreshTimeLogViews(taskId);
-}
-
-function extendLogEnd(taskId, logId) {
-  const log = findLog(taskId, logId);
-  if (!log || log.manual || !log.start || !log.end) {
+  const current = new Date(log[edge]);
+  if (Number.isNaN(current.getTime())) {
     return;
   }
 
-  const end = new Date(log.end);
-  if (Number.isNaN(end.getTime())) {
+  const adjusted = new Date(current.getTime() + deltaMinutes * LOG_ADJUSTMENT_MS);
+  if (edge === "start" && log.end && adjusted > new Date(log.end)) {
+    window.alert("Start time cannot move after the stop time.");
     return;
   }
 
-  log.end = new Date(end.getTime() + LOG_ADJUSTMENT_MS).toISOString();
+  if (edge === "start" && !log.end && adjusted > new Date()) {
+    window.alert("Start time cannot move into the future.");
+    return;
+  }
+
+  if (edge === "end" && adjusted < new Date(log.start)) {
+    window.alert("Stop time cannot move before the start time.");
+    return;
+  }
+
+  log[edge] = adjusted.toISOString();
   updateTimedLogDuration(log);
   saveState();
   refreshTimeLogViews(taskId);
@@ -1603,6 +1786,12 @@ function clearCompletedTasksWithPrompt() {
   clearCompletedTasks();
 }
 
+function toggleHideFinished() {
+  state.hideFinished = !state.hideFinished;
+  saveState();
+  render();
+}
+
 function clearCompletedTasks() {
   state.tasks = state.tasks.filter((task) => task.status !== "finished");
   normalizeBoard();
@@ -1670,6 +1859,7 @@ function resetStateWithPrompt() {
   state.timeGoalMs = DEFAULT_TIME_GOAL_MS;
   state.timeGoalCleared = false;
   state.goalChimeKey = "";
+  state.hideFinished = false;
   previousGoalRemainingMs = null;
   setTimeGoalInputs(state.timeGoalMs);
   activeTimeLogTaskId = null;
@@ -1680,14 +1870,6 @@ function resetStateWithPrompt() {
   closeDialog(elements.finishNoteDialog);
   closeDialog(elements.reportDialog);
   render();
-}
-
-function promoteTaskGoalIfNeeded(task) {
-  if (task.row === 0) {
-    return;
-  }
-
-  moveRow(task.row, 0);
 }
 
 function promoteTaskUrgency(task) {
@@ -1726,7 +1908,7 @@ function renderReportPreview() {
   summaryHeading.textContent = "Summary";
 
   const totals = document.createElement("dl");
-  BUCKETS.forEach((bucket) => {
+  getBucketsByTotal(report.totals).forEach((bucket) => {
     const term = document.createElement("dt");
     const detail = document.createElement("dd");
     term.textContent = bucket;
@@ -1794,6 +1976,13 @@ function renderReportPreview() {
   }
 
   elements.reportPreview.append(heading, summaryHeading, totals, goalHeading, goalList, timelineHeading, timelineList);
+
+  const exportHeading = document.createElement("h4");
+  exportHeading.textContent = "Exported Data";
+  const exportData = document.createElement("pre");
+  exportData.className = "report-export-data";
+  exportData.textContent = JSON.stringify(report.exportedData, null, 2);
+  elements.reportPreview.append(exportHeading, exportData);
 }
 
 function downloadReportFromDialog(event) {
@@ -1871,6 +2060,7 @@ function buildReport() {
     totals,
     goals: buildGoalReportEntries(goalTotals, goalObjectives),
     timeline: timeline.sort((a, b) => a.sortTime - b.sortTime),
+    exportedData: createExportPayload(reportEnd),
   };
 }
 
@@ -1880,9 +2070,11 @@ function buildGoalReportEntries(goalTotals, goalObjectives) {
       rowIndex,
       label: getRowName(rowIndex),
       durationMs: goalTotals.get(rowIndex) || 0,
+      hasUrgent: state.tasks.some((task) => task.row === rowIndex && task.urgent),
+      hasRunning: state.tasks.some((task) => task.row === rowIndex && isTaskRunning(task)),
       objectives: goalObjectives.get(rowIndex) || [],
     }))
-    .filter((entry) => entry.durationMs > 0)
+    .filter((entry) => entry.durationMs > 0 || entry.hasUrgent || entry.hasRunning)
     .sort((a, b) => b.durationMs - a.durationMs || a.rowIndex - b.rowIndex);
 }
 
@@ -1894,7 +2086,7 @@ function buildReportText(report = buildReport()) {
     "Summary",
   ];
 
-  BUCKETS.forEach((bucket) => {
+  getBucketsByTotal(report.totals).forEach((bucket) => {
     lines.push(`${bucket} - ${formatDuration(report.totals[bucket])}`);
   });
 
@@ -1924,6 +2116,8 @@ function buildReportText(report = buildReport()) {
     });
   }
 
+  lines.push("", "Exported Data", JSON.stringify(report.exportedData, null, 2));
+
   return `${lines.join("\n")}\n`;
 }
 
@@ -1937,7 +2131,9 @@ function normalizeBoard() {
   rows.forEach((row, rowIndex) => {
     const sortedRow = [...row].sort((a, b) => {
       const statusComparison = Number(a.status === "finished") - Number(b.status === "finished");
-      return statusComparison || a.order - b.order;
+      const runningComparison = Number(isTaskRunning(b)) - Number(isTaskRunning(a));
+      const urgentComparison = Number(b.urgent) - Number(a.urgent);
+      return statusComparison || runningComparison || urgentComparison || a.order - b.order;
     });
 
     sortedRow.forEach((task, orderIndex) => {
@@ -2021,7 +2217,7 @@ function getLogDuration(log, now = new Date()) {
   }
 
   if (log.end) {
-    return log.durationMs || Math.max(0, new Date(log.end).getTime() - new Date(log.start).getTime());
+    return Math.max(0, new Date(log.end).getTime() - new Date(log.start).getTime());
   }
 
   return Math.max(0, now.getTime() - new Date(log.start).getTime());
@@ -2030,7 +2226,7 @@ function getLogDuration(log, now = new Date()) {
 function formatLogLabel(log) {
   const duration = formatDuration(getLogDuration(log));
   if (log.manual) {
-    return `Manual entry - ${duration}`;
+    return `Manually added - ${duration}`;
   }
 
   const start = log.start ? formatTime(log.start) : "No start";
@@ -2089,8 +2285,8 @@ function getLogDurationWithinRange(log, reportStart, reportEnd) {
 function formatReportLogLabel(log, durationMs, reportStart, reportEnd) {
   const duration = formatDuration(durationMs);
   if (log.manual) {
-    const createdAt = log.createdAt ? formatTime(log.createdAt) : "Manual entry";
-    return `Manual entry at ${createdAt} (${duration})`;
+    const createdAt = formatTime(log.createdAt || reportStart);
+    return `Manually added at ${createdAt} (${duration})`;
   }
 
   const start = new Date(Math.max(new Date(log.start).getTime(), reportStart.getTime()));
@@ -2156,12 +2352,30 @@ function tick() {
 function updateTodayTotals() {
   const report = buildReport();
   const totalMs = BUCKETS.reduce((total, bucket) => total + report.totals[bucket], 0);
+  const workMs = BUCKETS
+    .filter((bucket) => bucket !== "Personal")
+    .reduce((total, bucket) => total + report.totals[bucket], 0);
   elements.todayTotalTime.textContent = formatDuration(totalMs);
+  elements.todayWorkTime.textContent = formatDuration(workMs);
   BUCKETS.forEach((bucket) => {
     elements.bucketTotalElements[bucket].textContent = formatDuration(report.totals[bucket]);
   });
+  renderBucketTotals(report.totals);
   renderGoalTotals(report.goals);
   updateTimeGoal(totalMs);
+}
+
+function getBucketsByTotal(totals) {
+  return [...BUCKETS].sort((a, b) => (totals[b] || 0) - (totals[a] || 0) || BUCKETS.indexOf(a) - BUCKETS.indexOf(b));
+}
+
+function renderBucketTotals(totals) {
+  getBucketsByTotal(totals).forEach((bucket) => {
+    const tile = elements.bucketTotalElements[bucket].closest("[data-bucket]");
+    if (tile) {
+      elements.todayTotals.appendChild(tile);
+    }
+  });
 }
 
 function updateUrgentIndicator() {
@@ -2182,8 +2396,13 @@ function renderGoalTotals(goals) {
   }
 
   goals.forEach((goal) => {
-    const item = document.createElement("div");
+    const item = document.createElement("button");
     item.className = "goal-total-item";
+    item.classList.toggle("is-active", goal.hasRunning);
+    item.classList.toggle("is-urgent", goal.hasUrgent);
+    item.dataset.action = "scroll-to-row";
+    item.dataset.rowIndex = String(goal.rowIndex);
+    item.type = "button";
 
     const label = document.createElement("span");
     label.textContent = goal.label;
@@ -2194,6 +2413,49 @@ function renderGoalTotals(goals) {
     item.append(label, total);
     elements.goalTotals.appendChild(item);
   });
+}
+
+function scrollToRow(rowIndex) {
+  if (!Number.isInteger(rowIndex)) {
+    return;
+  }
+
+  const row = document.querySelector(`.task-row[data-row-index="${rowIndex}"]`);
+  if (!row) {
+    return;
+  }
+
+  const stickyOffset = getStickyHeaderOffset();
+  const targetTop = row.getBoundingClientRect().top + window.scrollY - stickyOffset;
+  window.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+
+  window.setTimeout(() => {
+    keepRowBelowStickyHeader(row);
+  }, 350);
+}
+
+function getStickyHeaderOffset() {
+  const stickyHeader = document.querySelector(".app-header");
+  if (!stickyHeader) {
+    return 24;
+  }
+
+  const headerStyles = window.getComputedStyle(stickyHeader);
+  const stickyTop = Number.parseFloat(headerStyles.top) || 0;
+  const headerHeight = stickyHeader.getBoundingClientRect().height;
+  return stickyTop + headerHeight + 16;
+}
+
+function keepRowBelowStickyHeader(row) {
+  if (!row.isConnected) {
+    return;
+  }
+
+  const desiredTop = getStickyHeaderOffset();
+  const overlap = desiredTop - row.getBoundingClientRect().top;
+  if (overlap > 1) {
+    window.scrollBy({ top: -overlap, behavior: "smooth" });
+  }
 }
 
 function getTodayTotalMs() {
