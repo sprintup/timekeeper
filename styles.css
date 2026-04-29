@@ -340,7 +340,12 @@ button {
   margin-left: auto;
 }
 
+.flagged-notes-button.has-flagged-notes {
+  border-color: var(--red);
+}
+
 .urgent-indicator {
+  appearance: none;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -352,6 +357,7 @@ button {
   color: #70251e;
   font-size: 0.78rem;
   font-weight: 900;
+  text-decoration: none;
 }
 
 .urgent-indicator[hidden] {
@@ -490,6 +496,7 @@ button {
 
 .button:hover,
 .icon-button:hover,
+.urgent-indicator:hover,
 .add-task-tile:hover {
   transform: translateY(-1px);
 }
@@ -497,6 +504,7 @@ button {
 .button:focus-visible,
 .icon-button:focus-visible,
 .drag-handle:focus-visible,
+.urgent-indicator:focus-visible,
 .add-task-tile:focus-visible,
 input:focus-visible,
 select:focus-visible,
@@ -1184,7 +1192,8 @@ body.is-board-dragging * {
   align-items: start;
 }
 
-#flaggedNotesDialog .modal-body {
+#flaggedNotesDialog .modal-body,
+#urgentTasksDialog .modal-body {
   grid-template-rows: auto minmax(0, 1fr) auto;
   max-height: calc(100vh - 64px);
 }
@@ -1194,7 +1203,8 @@ body.is-board-dragging * {
   max-height: calc(100vh - 64px);
 }
 
-.flagged-notes-list {
+.flagged-notes-list,
+.urgent-tasks-list {
   max-height: min(58vh, 520px);
   min-height: 0;
   overflow-y: auto;
@@ -1275,11 +1285,13 @@ body.is-board-dragging * {
   text-transform: uppercase;
 }
 
-.flagged-note-item {
+.flagged-note-item,
+.urgent-task-item {
   align-items: start;
 }
 
-.flagged-note-open {
+.flagged-note-open,
+.urgent-task-open {
   appearance: none;
   display: grid;
   gap: 4px;
@@ -1292,18 +1304,22 @@ body.is-board-dragging * {
 }
 
 .flagged-note-open:hover .flagged-note-text,
-.flagged-note-open:focus-visible .flagged-note-text {
+.flagged-note-open:focus-visible .flagged-note-text,
+.urgent-task-open:hover .urgent-task-text,
+.urgent-task-open:focus-visible .urgent-task-text {
   text-decoration: underline;
 }
 
-.flagged-note-context {
+.flagged-note-context,
+.urgent-task-context {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 900;
   text-transform: uppercase;
 }
 
-.flagged-note-text {
+.flagged-note-text,
+.urgent-task-text {
   font-weight: 800;
 }
 

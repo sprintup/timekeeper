@@ -89,13 +89,13 @@
           <div class="goal-totals" id="goalTotals"></div>
         </div>
         <div class="goal-sticky-footer">
-          <div class="urgent-indicator" id="urgentIndicator" hidden>
+          <button class="urgent-indicator" id="urgentIndicator" type="button" hidden>
             <span class="urgent-flag" aria-hidden="true"></span>
             <span id="urgentIndicatorText">Urgent tasks</span>
-          </div>
+          </button>
           <div class="sticky-status-pill" id="goalCountPill">0 total activities</div>
           <div class="sticky-status-pill" id="unfinishedTaskCountPill">0 unfinished tasks</div>
-          <button class="button button-secondary flagged-notes-button" id="flaggedNotesButton" type="button">Flagged</button>
+          <button class="button button-secondary flagged-notes-button" id="flaggedNotesButton" type="button">Flagged Notes (0)</button>
           <button class="button button-secondary scroll-top-button" id="scrollTopButton" type="button" aria-label="Scroll to top" hidden>Top</button>
         </div>
       </section>
@@ -276,6 +276,21 @@
         <div class="time-log-list flagged-notes-list" id="flaggedNotesList"></div>
         <div class="modal-actions">
           <button class="button button-secondary" type="button" data-action="close-flagged-notes-dialog">Close</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="modal modal-wide" id="urgentTasksDialog">
+      <div class="modal-body">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Priority</p>
+            <h2>Urgent tasks</h2>
+          </div>
+        </div>
+        <div class="time-log-list urgent-tasks-list" id="urgentTasksList"></div>
+        <div class="modal-actions">
+          <button class="button button-secondary" type="button" data-action="close-urgent-tasks-dialog">Close</button>
         </div>
       </div>
     </dialog>

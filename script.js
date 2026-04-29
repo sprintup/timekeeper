@@ -141,6 +141,8 @@ function cacheElements() {
 
   elements.flaggedNotesDialog = document.getElementById("flaggedNotesDialog");
   elements.flaggedNotesList = document.getElementById("flaggedNotesList");
+  elements.urgentTasksDialog = document.getElementById("urgentTasksDialog");
+  elements.urgentTasksList = document.getElementById("urgentTasksList");
   elements.goalNotesDialog = document.getElementById("goalNotesDialog");
   elements.goalNotesDialogTitle = document.getElementById("goalNotesDialogTitle");
   elements.goalNotesList = document.getElementById("goalNotesList");
@@ -178,6 +180,7 @@ function bindEvents() {
   elements.emailReportButton.addEventListener("click", emailReportFromDialog);
   elements.copyReportButton.addEventListener("click", copyReportFromDialog);
   elements.flaggedNotesButton.addEventListener("click", openFlaggedNotesDialog);
+  elements.urgentIndicator.addEventListener("click", openUrgentTasksDialog);
   elements.scrollTopButton.addEventListener("click", scrollToTop);
 
   document.addEventListener("click", handleDocumentClick);
@@ -230,6 +233,11 @@ function handleDocumentClick(event) {
 
   if (action === "close-flagged-notes-dialog") {
     closeDialog(elements.flaggedNotesDialog);
+    return;
+  }
+
+  if (action === "close-urgent-tasks-dialog") {
+    closeDialog(elements.urgentTasksDialog);
     return;
   }
 
@@ -297,6 +305,11 @@ function handleDocumentClick(event) {
 
   if (action === "open-goal-note") {
     openGoalNote(actionElement.dataset.taskId, actionElement.dataset.noteId);
+    return;
+  }
+
+  if (action === "open-urgent-task") {
+    openUrgentTask(actionElement.dataset.taskId);
     return;
   }
 
@@ -576,6 +589,7 @@ function applyImportedState(importedState) {
   closeDialog(elements.logDialog);
   closeDialog(elements.finishNoteDialog);
   closeDialog(elements.flaggedNotesDialog);
+  closeDialog(elements.urgentTasksDialog);
   closeDialog(elements.goalNotesDialog);
   closeDialog(elements.reportDialog);
   render();
@@ -766,6 +780,9 @@ function render() {
   updateFlaggedNotesButton();
   if (elements.flaggedNotesDialog.open) {
     renderFlaggedNotesModal();
+  }
+  if (elements.urgentTasksDialog.open) {
+    renderUrgentTasksModal();
   }
   if (elements.goalNotesDialog.open) {
     renderGoalNotesModal();
@@ -1005,7 +1022,7 @@ function renderFinishNoteModal() {
   if (task.finishNotes.length === 0) {
     const empty = document.createElement("p");
     empty.className = "empty-log";
-    empty.textContent = 'No notes yet. Finished tasks without notes will show "finished" in reports.';
+    empty.textContent = "No notes yet. Finished tasks are marked in report task headers.";
     elements.finishNoteList.appendChild(empty);
     return;
   }
@@ -1181,6 +1198,11 @@ function openFlaggedNotesDialog() {
   openDialog(elements.flaggedNotesDialog);
 }
 
+function openUrgentTasksDialog() {
+  renderUrgentTasksModal();
+  openDialog(elements.urgentTasksDialog);
+}
+
 function renderFlaggedNotesModal() {
   const flaggedNotes = getFlaggedNotes();
   elements.flaggedNotesList.innerHTML = "";
@@ -1231,6 +1253,43 @@ function renderFlaggedNotesModal() {
   });
 }
 
+function renderUrgentTasksModal() {
+  const urgentTasks = getUrgentTasks();
+  elements.urgentTasksList.innerHTML = "";
+
+  if (urgentTasks.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty-log";
+    empty.textContent = "No urgent tasks.";
+    elements.urgentTasksList.appendChild(empty);
+    return;
+  }
+
+  urgentTasks.forEach((task) => {
+    const item = document.createElement("div");
+    item.className = "log-item urgent-task-item";
+    item.dataset.taskId = task.id;
+
+    const openButton = document.createElement("button");
+    openButton.className = "urgent-task-open";
+    openButton.dataset.action = "open-urgent-task";
+    openButton.dataset.taskId = task.id;
+    openButton.type = "button";
+
+    const context = document.createElement("span");
+    context.className = "urgent-task-context";
+    context.textContent = `${getRowName(task.row)} / ${task.bucket} / ${formatDuration(getTaskElapsed(task))}`;
+
+    const text = document.createElement("span");
+    text.className = "urgent-task-text";
+    text.textContent = task.objective;
+
+    openButton.append(context, text);
+    item.appendChild(openButton);
+    elements.urgentTasksList.appendChild(item);
+  });
+}
+
 function getFlaggedNotes() {
   return getSortedTasks()
     .flatMap((task) => task.finishNotes
@@ -1241,6 +1300,10 @@ function getFlaggedNotes() {
       || a.task.order - b.task.order
       || new Date(a.note.createdAt).getTime() - new Date(b.note.createdAt).getTime()
     ));
+}
+
+function getUrgentTasks() {
+  return getSortedTasks().filter((task) => task.urgent);
 }
 
 function openFlaggedNote(taskId, noteId) {
@@ -1254,6 +1317,16 @@ function openFlaggedNote(taskId, noteId) {
   window.setTimeout(() => {
     openFinishNoteDialog(taskId, noteId);
   }, 360);
+}
+
+function openUrgentTask(taskId) {
+  const task = findTask(taskId);
+  if (!task) {
+    return;
+  }
+
+  closeDialog(elements.urgentTasksDialog);
+  scrollToTask(taskId);
 }
 
 function openGoalNote(taskId, noteId) {
@@ -2329,6 +2402,7 @@ function resetStateWithPrompt() {
   closeDialog(elements.logDialog);
   closeDialog(elements.finishNoteDialog);
   closeDialog(elements.flaggedNotesDialog);
+  closeDialog(elements.urgentTasksDialog);
   closeDialog(elements.goalNotesDialog);
   closeDialog(elements.reportDialog);
   render();
@@ -2402,7 +2476,7 @@ function renderReportPreview() {
         entry.objectives.forEach((objective) => {
           const objectiveItem = document.createElement("li");
           const objectiveSummary = document.createElement("span");
-          objectiveSummary.textContent = `${objective.objective}${formatUrgentReportLabel(objective)} (${objective.bucket}) - ${formatDuration(objective.durationMs)}`;
+          objectiveSummary.textContent = formatReportObjectiveSummary(objective);
           objectiveItem.appendChild(objectiveSummary);
 
           if (objective.notes.length > 0) {
@@ -2477,7 +2551,7 @@ function downloadReportFromDialog(event) {
 
   const report = buildReport();
   const reportText = buildReportText(report);
-  const blob = new Blob([reportText], { type: "text/plain;charset=utf-8" });
+  const blob = new Blob([reportText], { type: "text/markdown;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -2604,6 +2678,7 @@ function buildReport(options = {}) {
         bucket: task.bucket,
         durationMs,
         wasUrgent: wasTaskEverUrgent(task),
+        isFinished: isTaskFinishedForReport(task),
         notes: getTaskReportNotes(task),
         logs: logEntries,
       });
@@ -2683,10 +2758,10 @@ function shouldIncludeReportObjective(task, durationMs) {
 
 function buildReportText(report = buildReport()) {
   const lines = [
-    "Timekeeper Aggregated Report",
+    "# Timekeeper Aggregated Report",
     `Date range: ${report.rangeLabel}`,
     "",
-    "Summary",
+    "# Summary",
   ];
 
   const totalMs = getReportTotalMs(report);
@@ -2694,24 +2769,24 @@ function buildReportText(report = buildReport()) {
     lines.push(`- ${bucket} - ${formatDuration(report.totals[bucket])} (${formatPercentage(report.totals[bucket], totalMs)})`);
   });
 
-  lines.push("", "Activities");
+  lines.push("", "# Activities");
 
   if (report.goals.length === 0) {
     lines.push("No time logged.");
   } else {
     const goalTotalMs = getReportGoalTotalMs(report);
     report.goals.forEach((goal) => {
-      lines.push(`- ${goal.label} - ${formatDuration(goal.durationMs)} (${formatPercentage(goal.durationMs, goalTotalMs)})`);
+      lines.push(`## ${goal.label} - ${formatDuration(goal.durationMs)} (${formatPercentage(goal.durationMs, goalTotalMs)})`);
       goal.objectives.forEach((objective) => {
-        lines.push(`  - ${objective.objective}${formatUrgentReportLabel(objective)} (${objective.bucket}) - ${formatDuration(objective.durationMs)}`);
+        lines.push(`- ${formatReportObjectiveSummary(objective)}`);
         objective.notes.forEach((note) => {
-          lines.push(`    - ${note}`);
+          lines.push(`  - ${note}`);
         });
       });
     });
   }
 
-  lines.push("", "Timeline");
+  lines.push("", "# Timeline");
 
   if (report.timeline.length === 0) {
     lines.push("No time logged.");
@@ -2719,7 +2794,7 @@ function buildReportText(report = buildReport()) {
     appendReportTimelineText(lines, report.timeline);
   }
 
-  lines.push("", "Exported Data", JSON.stringify(report.exportedData, null, 2));
+  lines.push("", "# Exported Data", "```json", JSON.stringify(report.exportedData, null, 2), "```");
 
   return `${lines.join("\n")}\n`;
 }
@@ -2732,7 +2807,7 @@ function appendReportTimelineText(lines, entries) {
     const dayKey = getTimelineEntryDayKey(entry);
     if (dayKey !== currentDayKey) {
       currentDayKey = dayKey;
-      lines.push(formatTimelineDay(entry));
+      lines.push(`## ${formatTimelineDay(entry)}`);
       lines.push(formatTimelineDaySummary(daySummaries.get(dayKey)));
     }
 
@@ -2741,7 +2816,7 @@ function appendReportTimelineText(lines, entries) {
 }
 
 function getReportFileName(report) {
-  return `timekeeper-report-${report.startDate}-to-${report.endDate}.txt`;
+  return `timekeeper-report-${report.startDate}-to-${report.endDate}.md`;
 }
 
 function normalizeBoard() {
@@ -2884,6 +2959,7 @@ function createReportLogEntry(log, task, reportStart, reportEnd) {
     objective: task.objective,
     bucket: task.bucket,
     wasUrgent: wasTaskEverUrgent(task),
+    isFinished: isTaskFinishedForReport(task),
     start: logWindow.start,
     end: logWindow.end,
     sortTime: logWindow.sortTime,
@@ -2893,15 +2969,9 @@ function createReportLogEntry(log, task, reportStart, reportEnd) {
 }
 
 function getTaskReportNotes(task) {
-  const notes = Array.isArray(task.finishNotes)
+  return Array.isArray(task.finishNotes)
     ? task.finishNotes.map((note) => note.text).filter(Boolean)
     : [];
-
-  if (notes.length > 0) {
-    return notes;
-  }
-
-  return task.status === "finished" || task.finishedAt ? ["finished"] : [];
 }
 
 function getReportTotalMs(report) {
@@ -2926,8 +2996,20 @@ function wasTaskEverUrgent(task) {
   return task.wasUrgent === true || task.urgent === true;
 }
 
+function isTaskFinishedForReport(task) {
+  return task.status === "finished" || Boolean(task.finishedAt);
+}
+
 function formatUrgentReportLabel(entry) {
   return entry.wasUrgent ? " [Marked urgent]" : "";
+}
+
+function formatFinishedReportLabel(entry) {
+  return entry.isFinished ? " finished" : "";
+}
+
+function formatReportObjectiveSummary(objective) {
+  return `${objective.objective}${formatUrgentReportLabel(objective)} (${objective.bucket}) - ${formatDuration(objective.durationMs)}${formatFinishedReportLabel(objective)}`;
 }
 
 function getLogDurationWithinRange(log, reportStart, reportEnd) {
@@ -2951,7 +3033,7 @@ function formatReportLogLabel(log, durationMs, reportStart, reportEnd) {
   const duration = formatDuration(durationMs);
   if (log.manual) {
     const createdAt = formatDateTime(log.createdAt || reportStart);
-    return `Manually added at ${createdAt} (${duration})`;
+    return `${createdAt} - Manually added (${duration})`;
   }
 
   const start = new Date(Math.max(new Date(log.start).getTime(), reportStart.getTime()));
@@ -2984,8 +3066,9 @@ function getReportLogWindow(log, reportStart, reportEnd) {
 function formatTimelineEntry(entry) {
   const timeRange = entry.start
     ? `${formatDateTime(entry.start)} - ${entry.end ? formatDateTime(entry.end) : "Running"}`
-    : entry.label.replace(/\s+\(.+\)$/, "");
-  return `${timeRange} (${formatDuration(entry.durationMs)}) | ${entry.objective}${formatUrgentReportLabel(entry)} | ${entry.bucket}`;
+    : entry.label;
+  const duration = entry.start ? ` (${formatDuration(entry.durationMs)})` : "";
+  return `${timeRange}${duration} | ${entry.objective}${formatUrgentReportLabel(entry)} | ${entry.bucket}`;
 }
 
 function getTimelineEntryDayKey(entry) {
@@ -3095,7 +3178,9 @@ function renderBucketTotals(totals) {
 function updateUrgentIndicator() {
   const urgentCount = state.tasks.filter((task) => task.urgent).length;
   elements.urgentIndicator.hidden = urgentCount === 0;
-  elements.urgentIndicatorText.textContent = urgentCount === 1 ? "1 urgent task" : `${urgentCount} urgent tasks`;
+  const label = urgentCount === 1 ? "1 urgent task" : `${urgentCount} urgent tasks`;
+  elements.urgentIndicatorText.textContent = label;
+  elements.urgentIndicator.setAttribute("aria-label", `${label}. Open urgent tasks.`);
 }
 
 function updateStickyCountPills() {
@@ -3107,7 +3192,8 @@ function updateStickyCountPills() {
 
 function updateFlaggedNotesButton() {
   const flaggedCount = getFlaggedNotes().length;
-  elements.flaggedNotesButton.textContent = flaggedCount > 0 ? `Flagged (${flaggedCount})` : "Flagged";
+  elements.flaggedNotesButton.textContent = `Flagged Notes (${flaggedCount})`;
+  elements.flaggedNotesButton.classList.toggle("has-flagged-notes", flaggedCount > 0);
 }
 
 function renderGoalTotals(goals) {
@@ -3158,6 +3244,37 @@ function scrollToRow(rowIndex) {
   window.setTimeout(() => {
     keepRowBelowStickyGoalPanel(row);
   }, 350);
+}
+
+function scrollToTask(taskId) {
+  const task = findTask(taskId);
+  if (!task) {
+    return;
+  }
+
+  const card = [...document.querySelectorAll(".task-card")]
+    .find((candidate) => candidate.dataset.taskId === taskId);
+  if (!card) {
+    scrollToRow(task.row);
+    return;
+  }
+
+  const row = card.closest(".task-row");
+  const stickyOffset = getStickyGoalPanelOffset();
+  const targetTop = card.getBoundingClientRect().top + window.scrollY - stickyOffset;
+  window.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+
+  const track = card.closest(".task-track");
+  if (track) {
+    const targetLeft = card.offsetLeft - ((track.clientWidth - card.offsetWidth) / 2);
+    track.scrollTo({ left: Math.max(0, targetLeft), behavior: "smooth" });
+  }
+
+  if (row) {
+    window.setTimeout(() => {
+      keepRowBelowStickyGoalPanel(row);
+    }, 350);
+  }
 }
 
 function getStickyGoalPanelOffset() {

@@ -43,18 +43,18 @@ Click **Start** on a task box to begin timing, or use **Save and start** when cr
 
 Use **Time log** to review, add, edit, delete, or nudge time entries for a task box. Time log entries include their dates. Use the Start and End `-` / `+` controls to move those timestamps by one minute. Use **Notes** to open the notes modal without finishing the task.
 
-Use **Finish** to mark a task complete and open the notes modal. Add, edit, delete, flag, or unflag notes there; finished tasks with no notes appear in reports as `finished`. Press **Finish** again on a completed task to add or manage notes. Completed task boxes move to the end of their activity and are no longer urgent. Use **Flagged** in the activity totals pane to review follow-up notes, jump back to the task notes, or unflag them. Use **Hide Finished** to hide or show finished task boxes.
+Use **Finish** to mark a task complete and open the notes modal. Add, edit, delete, flag, or unflag notes there; finished tasks are marked in report task lines. Press **Finish** again on a completed task to add or manage notes. Completed task boxes move to the end of their activity and are no longer urgent. Use **Flagged Notes** in the activity totals pane to review follow-up notes, jump back to the task notes, or unflag them. Use **Hide Finished** to hide or show finished task boxes.
 
 ### Reports
 
 Click **Generate report** to preview the aggregated report for all current time logs. The top time pane still shows today's time only. The report includes:
 
 - Bucket totals with percentages of the total report time
-- Activity totals sorted by most time, with percentages, indented objective totals, task notes, and a marker for tasks that were marked urgent
+- Activity totals sorted by most time, with percentages, Markdown activity headings, task notes, finished markers in task lines, and a marker for tasks that were marked urgent
 - Timeline of worked dates and times, separated by day with total time and a bucket breakdown summary, and listed with task, elapsed time, bucket, and urgent markers
 - Exported JSON data below the timeline
 
-You can download the report as a text file, copy it to the clipboard, or open a prefilled email draft with the report content. The **Delete logs, completed tasks, and empty activities on download** checkbox is checked by default when the report modal opens.
+You can download the report as a Markdown file, copy it to the clipboard, or open a prefilled email draft with the report content. The **Delete logs, completed tasks, and empty activities on download** checkbox is checked by default when the report modal opens.
 
 ### Moving Data
 
