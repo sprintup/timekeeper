@@ -715,6 +715,7 @@ function render() {
         <strong data-row-subtotal-index="${rowIndex}"></strong>
       </div>
       <div class="row-label-actions">
+        <button class="icon-button row-add-task-button" data-action="add-side-quest" data-row-index="${rowIndex}" type="button">Add task</button>
         <button class="icon-button row-notes-button" data-action="show-goal-notes" data-row-index="${rowIndex}" type="button">Notes (${goalNoteCount})</button>
         <button class="icon-button row-edit-button" data-action="edit-row" data-row-index="${rowIndex}" type="button">Rename</button>
         <button class="icon-button row-delete-button" data-action="delete-row" data-row-index="${rowIndex}" type="button">Delete</button>
@@ -733,7 +734,6 @@ function render() {
     activeTasks.forEach((task) => {
       track.appendChild(createTaskCard(task));
     });
-    track.appendChild(createSideQuestButton(rowIndex));
     completedTasks.forEach((task) => {
       track.appendChild(createTaskCard(task));
     });
@@ -784,16 +784,6 @@ function getRowIndexById(rowId) {
 
 function getGoalNoteCount(tasks) {
   return tasks.reduce((total, task) => total + (task.finishNotes?.length || 0), 0);
-}
-
-function createSideQuestButton(rowIndex) {
-  const button = document.createElement("button");
-  button.className = "side-quest-tile";
-  button.dataset.action = "add-side-quest";
-  button.dataset.rowIndex = String(rowIndex);
-  button.type = "button";
-  button.textContent = "Add task";
-  return button;
 }
 
 function createAddTaskFooter(isEmptyBoard = false) {
@@ -1342,12 +1332,7 @@ function moveDraggedTask(x, y) {
     return;
   }
 
-  const sideQuestButton = track.querySelector(".side-quest-tile");
-  if (sideQuestButton) {
-    track.insertBefore(activeDrag.card, sideQuestButton);
-  } else {
-    track.appendChild(activeDrag.card);
-  }
+  track.appendChild(activeDrag.card);
 }
 
 function moveDraggedRowTarget(x, y) {
