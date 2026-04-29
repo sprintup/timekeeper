@@ -19,7 +19,7 @@ Each goal shows:
 - Priority number
 - Goal name
 - Subtotal time for all task boxes in that goal
-- Show notes, rename, and delete controls
+- Notes, rename, and delete controls
 - Priority arrows for moving the goal up or down
 
 Deleting a goal also deletes the task boxes and time logs inside that goal.
@@ -41,7 +41,7 @@ Use **Urgent** on a task box to give it a red border and show a red urgent flag 
 
 Click **Start** on a task box to begin timing, or use **Save and start** when creating a task. Starting a task moves it to the far left of its current goal without changing the goal priority. Starting another task pauses the current one. Click **Pause** to stop the active timer.
 
-Use **Show time log** to review, add, edit, delete, or nudge time entries for a task box. Time log entries include their dates. Use the Start and End `-` / `+` controls to move those timestamps by one minute. Use **Show notes** to open the notes modal without finishing the task.
+Use **Time log** to review, add, edit, delete, or nudge time entries for a task box. Time log entries include their dates. Use the Start and End `-` / `+` controls to move those timestamps by one minute. Use **Notes** to open the notes modal without finishing the task.
 
 Use **Finish** to mark a task complete and open the notes modal. Add, edit, delete, flag, or unflag notes there; finished tasks with no notes appear in reports as `finished`. Press **Finish** again on a completed task to add or manage notes. Completed task boxes move to the end of their goal and are no longer urgent. Use **Flagged** in the goal totals pane to review follow-up notes, jump back to the task notes, or unflag them. Use **Hide Finished** to hide or show finished task boxes.
 

@@ -19,7 +19,7 @@
               <li>Start one task at a time. Starting another task pauses the active timer and moves the task to the left of its goal.</li>
               <li>Use Urgent on a task tile to add a red border and show the urgent flag below the goal totals.</li>
               <li>Use the priority arrows to rearrange goals vertically, or drag task boxes within and across goals.</li>
-              <li>Open Show time log to add, edit, or nudge entries. Generate reports, or use Export and Import to move the full board between browsers.</li>
+              <li>Open Time log to add, edit, or nudge entries. Generate reports, or use Export and Import to move the full board between browsers.</li>
             </ol>
           </div>
         </details>
@@ -135,11 +135,11 @@
           </div>
         </dl>
         <div class="task-card-controls task-card-time-log-controls">
-          <button class="button button-small time-log-button" data-action="show-log" type="button">Show time log</button>
+          <button class="button button-small time-log-button" data-action="show-log" type="button">Time log</button>
           <button class="button button-small button-secondary" data-action="add-log" type="button">Add log</button>
         </div>
         <div class="task-card-controls">
-          <button class="button button-small notes-button" data-action="show-notes" type="button">Show notes</button>
+          <button class="button button-small notes-button" data-action="show-notes" type="button">Notes</button>
           <button class="button button-small button-secondary" data-action="add-note" type="button">Add note</button>
         </div>
         <div class="task-actions">
@@ -155,7 +155,6 @@
       <form id="taskForm" method="dialog">
         <div class="modal-header">
           <h2 id="taskDialogTitle">Add task</h2>
-          <button class="icon-button" value="cancel" type="button" data-action="close-task-dialog" aria-label="Close">Close</button>
         </div>
         <input id="taskIdInput" type="hidden">
         <input id="taskPlacementInput" type="hidden">
@@ -208,7 +207,6 @@
       <form id="rowForm" method="dialog">
         <div class="modal-header">
           <h2 id="rowDialogTitle">Add goal</h2>
-          <button class="icon-button" value="cancel" type="button" data-action="close-row-dialog" aria-label="Close">Close</button>
         </div>
         <input id="rowIndexInput" type="hidden">
         <label class="field">
@@ -229,12 +227,11 @@
             <p class="eyebrow">Task Log</p>
             <h2 id="timeLogDialogTitle">Time log</h2>
           </div>
-          <button class="icon-button" value="cancel" type="button" data-action="close-time-log-dialog" aria-label="Close">Close</button>
         </div>
         <div class="time-log-list" id="timeLogList"></div>
         <div class="modal-actions">
           <button class="button button-secondary" type="button" data-action="close-time-log-dialog">Close</button>
-          <button class="button button-secondary" type="button" data-action="show-active-notes">Show Notes</button>
+          <button class="button button-secondary" type="button" data-action="show-active-notes">Notes</button>
           <button class="button button-primary" type="button" data-action="add-log-from-manager">Add time</button>
         </div>
       </div>
@@ -258,7 +255,7 @@
           </label>
           <div class="modal-actions">
             <button class="button button-secondary" type="button" data-action="close-finish-note-dialog">Close</button>
-            <button class="button button-secondary" type="button" data-action="show-active-time-log">Show time log</button>
+            <button class="button button-secondary" type="button" data-action="show-active-time-log">Time log</button>
             <button class="button button-primary" id="finishNoteSubmitButton" type="submit">Add note</button>
           </div>
         </form>
@@ -272,7 +269,6 @@
             <p class="eyebrow">Follow Up</p>
             <h2>Flagged notes</h2>
           </div>
-          <button class="icon-button" value="cancel" type="button" data-action="close-flagged-notes-dialog" aria-label="Close">Close</button>
         </div>
         <div class="time-log-list flagged-notes-list" id="flaggedNotesList"></div>
         <div class="modal-actions">
@@ -288,7 +284,6 @@
             <p class="eyebrow">Goal Notes</p>
             <h2 id="goalNotesDialogTitle">Goal notes</h2>
           </div>
-          <button class="icon-button" value="cancel" type="button" data-action="close-goal-notes-dialog" aria-label="Close">Close</button>
         </div>
         <div class="goal-notes-list" id="goalNotesList"></div>
         <div class="modal-actions">
@@ -301,7 +296,6 @@
       <form id="logForm" method="dialog">
         <div class="modal-header">
           <h2 id="logDialogTitle">Add time</h2>
-          <button class="icon-button" value="cancel" type="button" data-action="close-log-dialog" aria-label="Close">Close</button>
         </div>
         <input id="logTaskIdInput" type="hidden">
         <input id="logIdInput" type="hidden">
@@ -328,7 +322,6 @@
       <form id="reportForm" method="dialog">
         <div class="modal-header">
           <h2>Aggregated Report</h2>
-          <button class="icon-button" value="cancel" type="button" data-action="close-report-dialog" aria-label="Close">Close</button>
         </div>
         <div class="report-preview" id="reportPreview"></div>
         <label class="field">

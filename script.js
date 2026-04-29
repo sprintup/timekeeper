@@ -652,7 +652,7 @@ function sanitizeTimeGoal(value, fallback = 0) {
 
 function render() {
   normalizeBoard();
-  elements.clearCompletedButton.textContent = state.hideFinished ? "Show Finished" : "Hide Finished";
+  elements.clearCompletedButton.textContent = state.hideFinished ? "Display Finished" : "Hide Finished";
   elements.board.innerHTML = "";
 
   const rows = getRows();
@@ -676,7 +676,7 @@ function render() {
         <strong data-row-subtotal-index="${rowIndex}"></strong>
       </div>
       <div class="row-label-actions">
-        <button class="icon-button row-notes-button" data-action="show-goal-notes" data-row-index="${rowIndex}" type="button">Show notes (${goalNoteCount})</button>
+        <button class="icon-button row-notes-button" data-action="show-goal-notes" data-row-index="${rowIndex}" type="button">Notes (${goalNoteCount})</button>
         <button class="icon-button row-edit-button" data-action="edit-row" data-row-index="${rowIndex}" type="button">Rename</button>
         <button class="icon-button row-delete-button" data-action="delete-row" data-row-index="${rowIndex}" type="button">Delete</button>
       </div>
@@ -802,14 +802,14 @@ function createTaskCard(task) {
   toggleButton.textContent = isTaskRunning(task) ? "Pause" : "Start";
   urgentButton.classList.toggle("is-active", task.urgent);
   urgentButton.setAttribute("aria-pressed", String(task.urgent));
-  timeLogButton.textContent = `Show time log (${task.logs.length})`;
+  timeLogButton.textContent = `Time log (${task.logs.length})`;
   renderTaskNotesButton(notesButton, task);
 
   return fragment;
 }
 
 function renderTaskNotesButton(button, task) {
-  const label = `Show notes (${task.finishNotes.length})`;
+  const label = `Notes (${task.finishNotes.length})`;
   const hasFlaggedNote = taskHasFlaggedNotes(task);
   button.textContent = label;
   button.classList.toggle("has-flagged-note", hasFlaggedNote);
