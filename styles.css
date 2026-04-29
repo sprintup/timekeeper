@@ -358,6 +358,20 @@ button {
   display: none;
 }
 
+.sticky-status-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: #fbfbf8;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
 .urgent-flag {
   position: relative;
   display: inline-block;

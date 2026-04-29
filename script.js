@@ -88,6 +88,8 @@ function cacheElements() {
   elements.goalTotals = document.getElementById("goalTotals");
   elements.urgentIndicator = document.getElementById("urgentIndicator");
   elements.urgentIndicatorText = document.getElementById("urgentIndicatorText");
+  elements.goalCountPill = document.getElementById("goalCountPill");
+  elements.unfinishedTaskCountPill = document.getElementById("unfinishedTaskCountPill");
   elements.generateReportButton = document.getElementById("generateReportButton");
   elements.clearCompletedButton = document.getElementById("clearCompletedButton");
   elements.exportDataButton = document.getElementById("exportDataButton");
@@ -742,6 +744,7 @@ function render() {
 
   elements.board.appendChild(createAddTaskFooter(rows.length === 0));
   updateUrgentIndicator();
+  updateStickyCountPills();
   updateFlaggedNotesButton();
   if (elements.flaggedNotesDialog.open) {
     renderFlaggedNotesModal();
@@ -3049,6 +3052,13 @@ function updateUrgentIndicator() {
   const urgentCount = state.tasks.filter((task) => task.urgent).length;
   elements.urgentIndicator.hidden = urgentCount === 0;
   elements.urgentIndicatorText.textContent = urgentCount === 1 ? "1 urgent task" : `${urgentCount} urgent tasks`;
+}
+
+function updateStickyCountPills() {
+  const goalCount = state.rows.length;
+  const unfinishedTaskCount = state.tasks.filter((task) => task.status !== "finished").length;
+  elements.goalCountPill.textContent = `${goalCount} total goal${goalCount === 1 ? "" : "s"}`;
+  elements.unfinishedTaskCountPill.textContent = `${unfinishedTaskCount} unfinished task${unfinishedTaskCount === 1 ? "" : "s"}`;
 }
 
 function updateFlaggedNotesButton() {
