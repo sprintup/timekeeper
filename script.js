@@ -16,6 +16,7 @@ const elements = {};
 let activeDrag = null;
 let activeTimeLogTaskId = null;
 let activeFinishNoteTaskId = null;
+let activeGoalNotesRowId = null;
 let previousGoalRemainingMs = null;
 let chimeAudioContext = null;
 
@@ -100,6 +101,9 @@ function cacheElements() {
 
   elements.flaggedNotesDialog = document.getElementById("flaggedNotesDialog");
   elements.flaggedNotesList = document.getElementById("flaggedNotesList");
+  elements.goalNotesDialog = document.getElementById("goalNotesDialog");
+  elements.goalNotesDialogTitle = document.getElementById("goalNotesDialogTitle");
+  elements.goalNotesList = document.getElementById("goalNotesList");
 
   elements.reportDialog = document.getElementById("reportDialog");
   elements.reportForm = document.getElementById("reportForm");
@@ -189,6 +193,12 @@ function handleDocumentClick(event) {
     return;
   }
 
+  if (action === "close-goal-notes-dialog") {
+    activeGoalNotesRowId = null;
+    closeDialog(elements.goalNotesDialog);
+    return;
+  }
+
   if (action === "close-report-dialog") {
     closeDialog(elements.reportDialog);
     return;
@@ -201,6 +211,11 @@ function handleDocumentClick(event) {
 
   if (action === "edit-row") {
     openRowDialog("edit", Number(actionElement.dataset.rowIndex));
+    return;
+  }
+
+  if (action === "show-goal-notes") {
+    openGoalNotesDialog(Number(actionElement.dataset.rowIndex));
     return;
   }
 
@@ -246,6 +261,16 @@ function handleDocumentClick(event) {
     if (activeTimeLogTaskId) {
       openLogDialog(activeTimeLogTaskId);
     }
+    return;
+  }
+
+  if (action === "show-active-notes") {
+    showNotesFromTimeLog();
+    return;
+  }
+
+  if (action === "show-active-time-log") {
+    showTimeLogFromNotes();
     return;
   }
 
@@ -295,6 +320,10 @@ function handleDocumentClick(event) {
   }
 
   if (action === "show-notes") {
+    openFinishNoteDialog(taskId);
+  }
+
+  if (action === "add-note") {
     openFinishNoteDialog(taskId);
   }
 
@@ -487,6 +516,7 @@ function applyImportedState(importedState) {
   previousGoalRemainingMs = null;
   activeTimeLogTaskId = null;
   activeFinishNoteTaskId = null;
+  activeGoalNotesRowId = null;
 
   setTimeGoalInputs(state.timeGoalMs);
   normalizeBoard();
@@ -498,6 +528,7 @@ function applyImportedState(importedState) {
   closeDialog(elements.logDialog);
   closeDialog(elements.finishNoteDialog);
   closeDialog(elements.flaggedNotesDialog);
+  closeDialog(elements.goalNotesDialog);
   closeDialog(elements.reportDialog);
   render();
 }
@@ -626,6 +657,7 @@ function render() {
 
   const rows = getRows();
   rows.forEach((tasks, rowIndex) => {
+    const goalNoteCount = getGoalNoteCount(tasks);
     const row = document.createElement("section");
     row.className = "task-row";
     row.dataset.rowIndex = String(rowIndex);
@@ -644,6 +676,7 @@ function render() {
         <strong data-row-subtotal-index="${rowIndex}"></strong>
       </div>
       <div class="row-label-actions">
+        <button class="icon-button row-notes-button" data-action="show-goal-notes" data-row-index="${rowIndex}" type="button">Show notes (${goalNoteCount})</button>
         <button class="icon-button row-edit-button" data-action="edit-row" data-row-index="${rowIndex}" type="button">Rename</button>
         <button class="icon-button row-delete-button" data-action="delete-row" data-row-index="${rowIndex}" type="button">Delete</button>
       </div>
@@ -676,6 +709,9 @@ function render() {
   if (elements.flaggedNotesDialog.open) {
     renderFlaggedNotesModal();
   }
+  if (elements.goalNotesDialog.open) {
+    renderGoalNotesModal();
+  }
   tick();
 }
 
@@ -696,6 +732,18 @@ function getRows() {
 
 function getRowName(rowIndex) {
   return state.rows[rowIndex]?.name || `Goal ${rowIndex + 1}`;
+}
+
+function getRowIndexById(rowId) {
+  if (!rowId) {
+    return -1;
+  }
+
+  return state.rows.findIndex((row) => row.id === rowId);
+}
+
+function getGoalNoteCount(tasks) {
+  return tasks.reduce((total, task) => total + (task.finishNotes?.length || 0), 0);
 }
 
 function createSideQuestButton(rowIndex) {
@@ -977,8 +1025,94 @@ function toggleFinishNoteFlag(taskId, noteId) {
     renderFlaggedNotesModal();
   }
 
+  if (elements.goalNotesDialog.open) {
+    renderGoalNotesModal();
+  }
+
   updateFlaggedNotesButton();
   render();
+}
+
+function openGoalNotesDialog(rowIndex) {
+  if (!Number.isInteger(rowIndex) || !state.rows[rowIndex]) {
+    return;
+  }
+
+  activeGoalNotesRowId = state.rows[rowIndex].id;
+  renderGoalNotesModal();
+  openDialog(elements.goalNotesDialog);
+}
+
+function renderGoalNotesModal() {
+  const rowIndex = getRowIndexById(activeGoalNotesRowId);
+  if (rowIndex < 0) {
+    activeGoalNotesRowId = null;
+    closeDialog(elements.goalNotesDialog);
+    return;
+  }
+
+  elements.goalNotesDialogTitle.textContent = getRowName(rowIndex);
+  elements.goalNotesList.innerHTML = "";
+
+  const noteGroups = getGoalNoteGroups(rowIndex);
+  if (noteGroups.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty-log";
+    empty.textContent = "No notes for this goal.";
+    elements.goalNotesList.appendChild(empty);
+    return;
+  }
+
+  noteGroups.forEach(({ task, notes }) => {
+    const section = document.createElement("section");
+    section.className = "goal-note-group";
+
+    const heading = document.createElement("h3");
+    heading.textContent = task.objective;
+
+    const list = document.createElement("ul");
+    list.className = "goal-note-items";
+    notes.forEach((note) => {
+      list.appendChild(createGoalNoteItem(note));
+    });
+
+    section.append(heading, list);
+    elements.goalNotesList.appendChild(section);
+  });
+}
+
+function getGoalNoteGroups(rowIndex) {
+  return getSortedTasks()
+    .filter((task) => task.row === rowIndex && task.finishNotes.length > 0)
+    .map((task) => ({
+      task,
+      notes: [...task.finishNotes].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
+    }));
+}
+
+function createGoalNoteItem(note) {
+  const item = document.createElement("li");
+  item.className = "goal-note-item";
+  item.classList.toggle("is-flagged", note.flagged);
+
+  const text = document.createElement("span");
+  text.className = "goal-note-text";
+  text.textContent = note.text;
+  item.appendChild(text);
+
+  if (note.flagged) {
+    const flag = document.createElement("span");
+    flag.className = "goal-note-flag";
+    const flagIcon = document.createElement("span");
+    flagIcon.className = "urgent-flag note-flag-indicator";
+    flagIcon.setAttribute("aria-hidden", "true");
+    const flagText = document.createElement("span");
+    flagText.textContent = "Flagged";
+    flag.append(flagIcon, flagText);
+    item.appendChild(flag);
+  }
+
+  return item;
 }
 
 function openFlaggedNotesDialog() {
@@ -1443,6 +1577,28 @@ function reopenActiveTimeLogDialog() {
 
   renderTimeLogModal();
   openDialog(elements.timeLogDialog);
+}
+
+function showNotesFromTimeLog() {
+  const taskId = activeTimeLogTaskId;
+  if (!taskId || !findTask(taskId)) {
+    return;
+  }
+
+  activeTimeLogTaskId = null;
+  closeDialog(elements.timeLogDialog);
+  openFinishNoteDialog(taskId);
+}
+
+function showTimeLogFromNotes() {
+  const taskId = activeFinishNoteTaskId;
+  if (!taskId || !findTask(taskId)) {
+    return;
+  }
+
+  activeFinishNoteTaskId = null;
+  closeDialog(elements.finishNoteDialog);
+  openTimeLogDialog(taskId);
 }
 
 function openLogDialog(taskId, logId = "") {
@@ -1973,6 +2129,36 @@ function deleteTimeLogs() {
   render();
 }
 
+function deleteTimeLogsAndCompletedTasks() {
+  state.tasks.forEach((task) => {
+    task.logs = [];
+  });
+  state.tasks = state.tasks.filter((task) => task.status !== "finished");
+  removeRowsWithoutTasks();
+  normalizeBoard();
+  saveState();
+
+  if (activeTimeLogTaskId && !findTask(activeTimeLogTaskId)) {
+    activeTimeLogTaskId = null;
+    closeDialog(elements.timeLogDialog);
+    closeDialog(elements.logDialog);
+  } else if (activeTimeLogTaskId) {
+    renderTimeLogModal();
+  }
+
+  if (activeFinishNoteTaskId && !findTask(activeFinishNoteTaskId)) {
+    activeFinishNoteTaskId = null;
+    closeDialog(elements.finishNoteDialog);
+  }
+
+  if (activeGoalNotesRowId && getRowIndexById(activeGoalNotesRowId) < 0) {
+    activeGoalNotesRowId = null;
+    closeDialog(elements.goalNotesDialog);
+  }
+
+  render();
+}
+
 function clearCompletedTasksWithPrompt() {
   const completedCount = state.tasks.filter((task) => task.status === "finished").length;
   if (completedCount === 0) {
@@ -2065,11 +2251,13 @@ function resetStateWithPrompt() {
   setTimeGoalInputs(state.timeGoalMs);
   activeTimeLogTaskId = null;
   activeFinishNoteTaskId = null;
+  activeGoalNotesRowId = null;
   window.localStorage.removeItem(STORAGE_KEY);
   closeDialog(elements.timeLogDialog);
   closeDialog(elements.logDialog);
   closeDialog(elements.finishNoteDialog);
   closeDialog(elements.flaggedNotesDialog);
+  closeDialog(elements.goalNotesDialog);
   closeDialog(elements.reportDialog);
   render();
 }
@@ -2128,11 +2316,12 @@ function renderReportPreview() {
     item.textContent = "No time logged.";
     goalList.appendChild(item);
   } else {
+    const goalTotalMs = getReportGoalTotalMs(report);
     report.goals.forEach((entry) => {
       const item = document.createElement("li");
 
       const summary = document.createElement("span");
-      summary.textContent = `${entry.label} - ${formatDuration(entry.durationMs)}`;
+      summary.textContent = `${entry.label} - ${formatDuration(entry.durationMs)} (${formatPercentage(entry.durationMs, goalTotalMs)})`;
       item.appendChild(summary);
 
       if (entry.objectives.length > 0) {
@@ -2188,6 +2377,7 @@ function renderReportPreview() {
 
 function renderReportTimelinePreview(list, entries) {
   let currentDayKey = "";
+  const daySummaries = getTimelineDaySummaries(entries);
 
   entries.forEach((entry) => {
     const dayKey = getTimelineEntryDayKey(entry);
@@ -2195,7 +2385,12 @@ function renderReportTimelinePreview(list, entries) {
       currentDayKey = dayKey;
       const separator = document.createElement("li");
       separator.className = "report-day-separator";
-      separator.textContent = formatTimelineDay(entry);
+      const dayLabel = document.createElement("strong");
+      dayLabel.textContent = formatTimelineDay(entry);
+      const bucketBreakdown = document.createElement("span");
+      bucketBreakdown.className = "report-day-buckets";
+      bucketBreakdown.textContent = formatBucketBreakdown(daySummaries.get(dayKey));
+      separator.append(dayLabel, bucketBreakdown);
       list.appendChild(separator);
     }
 
@@ -2223,7 +2418,7 @@ function downloadReportFromDialog(event) {
   closeDialog(elements.reportDialog);
 
   if (elements.deleteAfterReportInput.checked) {
-    deleteTimeLogs();
+    deleteTimeLogsAndCompletedTasks();
   }
 }
 
@@ -2344,13 +2539,15 @@ function buildReport(options = {}) {
     }
   });
 
+  const goals = buildGoalReportEntries(goalTotals, goalObjectives);
   return {
     rangeLabel: `${formatDateTime(reportStart)} - ${formatDateTime(reportEnd)}`,
     startDate: formatFileDate(reportStart),
     endDate: formatFileDate(reportEnd),
     totals,
     totalMs: BUCKETS.reduce((total, bucket) => total + totals[bucket], 0),
-    goals: buildGoalReportEntries(goalTotals, goalObjectives),
+    goals,
+    goalTotalMs: goals.reduce((total, goal) => total + goal.durationMs, 0),
     timeline: timeline.sort((a, b) => a.sortTime - b.sortTime),
     exportedData: createExportPayload(reportEnd),
   };
@@ -2426,8 +2623,9 @@ function buildReportText(report = buildReport()) {
   if (report.goals.length === 0) {
     lines.push("No time logged.");
   } else {
+    const goalTotalMs = getReportGoalTotalMs(report);
     report.goals.forEach((goal) => {
-      lines.push(`- ${goal.label} - ${formatDuration(goal.durationMs)}`);
+      lines.push(`- ${goal.label} - ${formatDuration(goal.durationMs)} (${formatPercentage(goal.durationMs, goalTotalMs)})`);
       goal.objectives.forEach((objective) => {
         lines.push(`  - ${objective.objective}${formatUrgentReportLabel(objective)} (${objective.bucket}) - ${formatDuration(objective.durationMs)}`);
         objective.notes.forEach((note) => {
@@ -2452,12 +2650,14 @@ function buildReportText(report = buildReport()) {
 
 function appendReportTimelineText(lines, entries) {
   let currentDayKey = "";
+  const daySummaries = getTimelineDaySummaries(entries);
 
   entries.forEach((entry) => {
     const dayKey = getTimelineEntryDayKey(entry);
     if (dayKey !== currentDayKey) {
       currentDayKey = dayKey;
       lines.push(formatTimelineDay(entry));
+      lines.push(`Bucket breakdown: ${formatBucketBreakdown(daySummaries.get(dayKey))}`);
     }
 
     lines.push(`- ${formatTimelineEntry(entry)}`);
@@ -2483,6 +2683,25 @@ function normalizeBoard() {
       task.row = rowIndex;
       task.order = orderIndex;
     });
+  });
+}
+
+function removeRowsWithoutTasks() {
+  ensureRowsForTasks();
+  const rowsWithTasks = new Set(state.tasks.map((task) => task.row));
+  const rowIndexMap = new Map();
+
+  state.rows = state.rows.filter((row, rowIndex) => {
+    if (!rowsWithTasks.has(rowIndex)) {
+      return false;
+    }
+
+    rowIndexMap.set(rowIndex, rowIndexMap.size);
+    return true;
+  });
+
+  state.tasks.forEach((task) => {
+    task.row = rowIndexMap.get(task.row) ?? task.row;
   });
 }
 
@@ -2617,6 +2836,16 @@ function getReportTotalMs(report) {
   return BUCKETS.reduce((total, bucket) => total + (report.totals[bucket] || 0), 0);
 }
 
+function getReportGoalTotalMs(report) {
+  if (Number.isFinite(report.goalTotalMs)) {
+    return report.goalTotalMs;
+  }
+
+  return Array.isArray(report.goals)
+    ? report.goals.reduce((total, goal) => total + (goal.durationMs || 0), 0)
+    : 0;
+}
+
 function wasTaskEverUrgent(task) {
   return task.wasUrgent === true || task.urgent === true;
 }
@@ -2685,6 +2914,31 @@ function formatTimelineEntry(entry) {
 
 function getTimelineEntryDayKey(entry) {
   return formatFileDate(new Date(entry.sortTime));
+}
+
+function getTimelineDaySummaries(entries) {
+  return entries.reduce((summaries, entry) => {
+    const dayKey = getTimelineEntryDayKey(entry);
+    const summary = summaries.get(dayKey) || {
+      totals: Object.fromEntries(BUCKETS.map((bucket) => [bucket, 0])),
+      totalMs: 0,
+    };
+    summary.totals[entry.bucket] = (summary.totals[entry.bucket] || 0) + entry.durationMs;
+    summary.totalMs += entry.durationMs;
+    summaries.set(dayKey, summary);
+    return summaries;
+  }, new Map());
+}
+
+function formatBucketBreakdown(summary) {
+  if (!summary || summary.totalMs <= 0) {
+    return "No time logged.";
+  }
+
+  return getBucketsByTotal(summary.totals)
+    .filter((bucket) => summary.totals[bucket] > 0)
+    .map((bucket) => `${bucket}: ${formatDuration(summary.totals[bucket])} (${formatPercentage(summary.totals[bucket], summary.totalMs)})`)
+    .join("; ");
 }
 
 function formatTimelineDay(entry) {

@@ -134,8 +134,14 @@
             <dd class="finished-time"></dd>
           </div>
         </dl>
-        <button class="button button-small time-log-button" data-action="show-log" type="button">Show time log</button>
-        <button class="button button-small notes-button" data-action="show-notes" type="button">Show notes</button>
+        <div class="task-card-controls">
+          <button class="button button-small time-log-button" data-action="show-log" type="button">Show time log</button>
+          <button class="button button-small button-secondary" data-action="add-log" type="button">Add log</button>
+        </div>
+        <div class="task-card-controls">
+          <button class="button button-small notes-button" data-action="show-notes" type="button">Show notes</button>
+          <button class="button button-small button-secondary" data-action="add-note" type="button">Add note</button>
+        </div>
         <div class="task-actions">
           <button class="button button-small button-start" data-action="toggle-timer" type="button">Start</button>
           <button class="button button-small button-urgent" data-action="toggle-urgent" type="button">Urgent</button>
@@ -228,6 +234,7 @@
         <div class="time-log-list" id="timeLogList"></div>
         <div class="modal-actions">
           <button class="button button-secondary" type="button" data-action="close-time-log-dialog">Close</button>
+          <button class="button button-secondary" type="button" data-action="show-active-notes">Show Notes</button>
           <button class="button button-primary" type="button" data-action="add-log-from-manager">Add time</button>
         </div>
       </div>
@@ -251,6 +258,7 @@
           </label>
           <div class="modal-actions">
             <button class="button button-secondary" type="button" data-action="close-finish-note-dialog">Close</button>
+            <button class="button button-secondary" type="button" data-action="show-active-time-log">Show time log</button>
             <button class="button button-primary" id="finishNoteSubmitButton" type="submit">Add note</button>
           </div>
         </form>
@@ -269,6 +277,22 @@
         <div class="time-log-list flagged-notes-list" id="flaggedNotesList"></div>
         <div class="modal-actions">
           <button class="button button-secondary" type="button" data-action="close-flagged-notes-dialog">Close</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="modal modal-wide" id="goalNotesDialog">
+      <div class="modal-body">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Goal Notes</p>
+            <h2 id="goalNotesDialogTitle">Goal notes</h2>
+          </div>
+          <button class="icon-button" value="cancel" type="button" data-action="close-goal-notes-dialog" aria-label="Close">Close</button>
+        </div>
+        <div class="goal-notes-list" id="goalNotesList"></div>
+        <div class="modal-actions">
+          <button class="button button-secondary" type="button" data-action="close-goal-notes-dialog">Close</button>
         </div>
       </div>
     </dialog>
@@ -313,7 +337,7 @@
         </label>
         <label class="checkline">
           <input id="deleteAfterReportInput" type="checkbox">
-          <span>Delete time logs after download</span>
+          <span>Delete logs and completed tasks</span>
         </label>
         <div class="modal-actions">
           <button class="button button-secondary" type="button" data-action="close-report-dialog">Cancel</button>

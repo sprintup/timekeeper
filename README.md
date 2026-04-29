@@ -19,7 +19,7 @@ Each goal shows:
 - Priority number
 - Goal name
 - Subtotal time for all task boxes in that goal
-- Rename and delete controls
+- Show notes, rename, and delete controls
 - Priority arrows for moving the goal up or down
 
 Deleting a goal also deletes the task boxes and time logs inside that goal.
@@ -50,11 +50,11 @@ Use **Finish** to mark a task complete and open the notes modal. Add, edit, dele
 Click **Generate report** to preview the aggregated report for all current time logs. The top time pane still shows today's time only. The report includes:
 
 - Bucket totals with percentages of the total report time
-- Goal totals sorted by most time, with indented objective totals, task notes, and a marker for tasks that were marked urgent
-- Timeline of worked dates and times, separated by day and listed with task, elapsed time, bucket, and urgent markers
+- Goal totals sorted by most time, with percentages, indented objective totals, task notes, and a marker for tasks that were marked urgent
+- Timeline of worked dates and times, separated by day with a bucket breakdown summary, and listed with task, elapsed time, bucket, and urgent markers
 - Exported JSON data below the timeline
 
-You can download the report as a text file, copy it to the clipboard, or open a prefilled email draft with the report content. The **Delete time logs after download** checkbox is checked by default when the report modal opens.
+You can download the report as a text file, copy it to the clipboard, or open a prefilled email draft with the report content. The **Delete logs and completed tasks** checkbox is checked by default when the report modal opens and also removes goals left without tasks.
 
 ### Moving Data
 

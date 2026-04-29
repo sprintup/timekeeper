@@ -643,6 +643,7 @@ summary:focus-visible {
   gap: 6px;
 }
 
+.row-notes-button,
 .row-edit-button,
 .row-delete-button {
   align-self: start;
@@ -875,12 +876,24 @@ body.is-board-dragging * {
   font-size: 0.9rem;
 }
 
-.time-log-button {
+.task-card-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.task-card-controls + .task-card-controls {
+  margin-top: 8px;
+}
+
+.task-stats + .task-card-controls {
   margin-top: auto;
 }
 
-.time-log-button + .notes-button {
-  margin-top: 8px;
+.task-card-controls .button {
+  min-width: 0;
+  white-space: normal;
 }
 
 .notes-button.has-flagged-note {
@@ -1109,6 +1122,8 @@ body.is-board-dragging * {
 }
 
 .report-preview .report-day-separator {
+  display: grid;
+  gap: 3px;
   margin: 10px 0 5px -18px;
   border-top: 1px solid var(--line);
   padding-top: 8px;
@@ -1117,6 +1132,13 @@ body.is-board-dragging * {
   font-weight: 900;
   list-style: none;
   text-transform: uppercase;
+}
+
+.report-preview .report-day-buckets {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: none;
 }
 
 .report-preview .report-day-separator:first-child {
@@ -1152,6 +1174,82 @@ body.is-board-dragging * {
 
 .notes-list .log-item {
   align-items: start;
+}
+
+#flaggedNotesDialog .modal-body {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  max-height: calc(100vh - 64px);
+}
+
+#goalNotesDialog .modal-body {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  max-height: calc(100vh - 64px);
+}
+
+.flagged-notes-list {
+  max-height: min(58vh, 520px);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.goal-notes-list {
+  display: grid;
+  gap: 14px;
+  max-height: min(58vh, 520px);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+
+.goal-note-group {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.goal-note-group h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+
+.goal-note-items {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.goal-note-item {
+  display: grid;
+  gap: 6px;
+  border-left: 3px solid var(--line);
+  padding: 7px 8px;
+  background: #ffffff;
+  overflow-wrap: anywhere;
+}
+
+.goal-note-item.is-flagged {
+  border-left-color: var(--red);
+  background: var(--red-soft);
+}
+
+.goal-note-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  color: #70251e;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .flagged-note-item {
