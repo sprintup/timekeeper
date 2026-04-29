@@ -295,6 +295,11 @@ function handleDocumentClick(event) {
     return;
   }
 
+  if (action === "open-goal-note") {
+    openGoalNote(actionElement.dataset.taskId, actionElement.dataset.noteId);
+    return;
+  }
+
   if (action === "add-side-quest") {
     openTaskDialog("add", "side", null, Number(actionElement.dataset.rowIndex));
     return;
@@ -712,11 +717,6 @@ function render() {
     label.className = "row-label";
     label.innerHTML = `
       <span class="row-priority-label">Priority ${rowIndex + 1}</span>
-      <div class="row-priority-controls" aria-label="Activity priority controls">
-        <button class="icon-button row-priority-button" data-action="move-row-up" data-row-index="${rowIndex}" aria-label="Increase activity priority" title="Increase priority" type="button"${rowIndex === 0 ? " disabled" : ""}>&uarr;</button>
-        <button class="icon-button row-priority-button" data-action="move-row-down" data-row-index="${rowIndex}" aria-label="Decrease activity priority" title="Decrease priority" type="button"${rowIndex === rows.length - 1 ? " disabled" : ""}>&darr;</button>
-        <button class="icon-button row-edit-button" data-action="edit-row" data-row-index="${rowIndex}" type="button">Edit</button>
-      </div>
       <strong></strong>
       <div class="row-subtotal">
         <span>Subtotal</span>
@@ -732,6 +732,11 @@ function render() {
           <span>Notes (${goalNoteCount})</span>
           ${goalHasFlaggedNotes ? '<span class="urgent-flag note-flag-indicator" aria-hidden="true"></span>' : ""}
         </button>
+      </div>
+      <div class="row-priority-controls" aria-label="Activity priority controls">
+        <button class="icon-button row-priority-button" data-action="move-row-up" data-row-index="${rowIndex}" aria-label="Increase activity priority" title="Increase priority" type="button"${rowIndex === 0 ? " disabled" : ""}>&uarr;</button>
+        <button class="icon-button row-priority-button" data-action="move-row-down" data-row-index="${rowIndex}" aria-label="Decrease activity priority" title="Decrease priority" type="button"${rowIndex === rows.length - 1 ? " disabled" : ""}>&darr;</button>
+        <button class="icon-button row-edit-button" data-action="edit-row" data-row-index="${rowIndex}" type="button">Edit</button>
       </div>
     `;
     label.querySelector("strong").textContent = getRowName(rowIndex);
@@ -1120,7 +1125,7 @@ function renderGoalNotesModal() {
     const list = document.createElement("ul");
     list.className = "goal-note-items";
     notes.forEach((note) => {
-      list.appendChild(createGoalNoteItem(note));
+      list.appendChild(createGoalNoteItem(task, note));
     });
 
     section.append(heading, list);
@@ -1137,15 +1142,23 @@ function getGoalNoteGroups(rowIndex) {
     }));
 }
 
-function createGoalNoteItem(note) {
+function createGoalNoteItem(task, note) {
   const item = document.createElement("li");
   item.className = "goal-note-item";
   item.classList.toggle("is-flagged", note.flagged);
 
+  const openButton = document.createElement("button");
+  openButton.className = "goal-note-open";
+  openButton.dataset.action = "open-goal-note";
+  openButton.dataset.taskId = task.id;
+  openButton.dataset.noteId = note.id;
+  openButton.type = "button";
+  openButton.setAttribute("aria-label", `Open notes for ${task.objective}`);
+
   const text = document.createElement("span");
   text.className = "goal-note-text";
   text.textContent = note.text;
-  item.appendChild(text);
+  openButton.appendChild(text);
 
   if (note.flagged) {
     const flag = document.createElement("span");
@@ -1156,9 +1169,10 @@ function createGoalNoteItem(note) {
     const flagText = document.createElement("span");
     flagText.textContent = "Flagged";
     flag.append(flagIcon, flagText);
-    item.appendChild(flag);
+    openButton.appendChild(flag);
   }
 
+  item.appendChild(openButton);
   return item;
 }
 
@@ -1236,6 +1250,20 @@ function openFlaggedNote(taskId, noteId) {
   }
 
   closeDialog(elements.flaggedNotesDialog);
+  scrollToRow(task.row);
+  window.setTimeout(() => {
+    openFinishNoteDialog(taskId, noteId);
+  }, 360);
+}
+
+function openGoalNote(taskId, noteId) {
+  const task = findTask(taskId);
+  if (!task) {
+    return;
+  }
+
+  activeGoalNotesRowId = null;
+  closeDialog(elements.goalNotesDialog);
   scrollToRow(task.row);
   window.setTimeout(() => {
     openFinishNoteDialog(taskId, noteId);

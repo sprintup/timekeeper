@@ -1236,10 +1236,7 @@ body.is-board-dragging * {
 }
 
 .goal-note-item {
-  display: grid;
-  gap: 6px;
   border-left: 3px solid var(--line);
-  padding: 7px 8px;
   background: #ffffff;
   overflow-wrap: anywhere;
 }
@@ -1247,6 +1244,24 @@ body.is-board-dragging * {
 .goal-note-item.is-flagged {
   border-left-color: var(--red);
   background: var(--red-soft);
+}
+
+.goal-note-open {
+  appearance: none;
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  border: 0;
+  padding: 7px 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.goal-note-open:hover .goal-note-text,
+.goal-note-open:focus-visible .goal-note-text {
+  text-decoration: underline;
 }
 
 .goal-note-flag {
