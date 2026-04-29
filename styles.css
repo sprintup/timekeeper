@@ -883,8 +883,8 @@ body.is-board-dragging * {
   align-items: stretch;
 }
 
-.task-card-controls + .task-card-controls {
-  margin-top: 8px;
+.task-card-time-log-controls {
+  margin-bottom: 8px;
 }
 
 .task-stats + .task-card-controls {
