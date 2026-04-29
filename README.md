@@ -54,7 +54,7 @@ Click **Generate report** to preview the aggregated report for all current time 
 - Timeline of worked dates and times, separated by day with a bucket breakdown summary, and listed with task, elapsed time, bucket, and urgent markers
 - Exported JSON data below the timeline
 
-You can download the report as a text file, copy it to the clipboard, or open a prefilled email draft with the report content. The **Delete logs and completed tasks** checkbox is checked by default when the report modal opens and also removes goals left without tasks.
+You can download the report as a text file, copy it to the clipboard, or open a prefilled email draft with the report content. The **Delete logs, completed tasks, and empty goals** checkbox is checked by default when the report modal opens.
 
 ### Moving Data
 
