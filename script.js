@@ -2433,7 +2433,7 @@ function renderReportTimelinePreview(list, entries) {
       dayLabel.textContent = formatTimelineDay(entry);
       const bucketBreakdown = document.createElement("span");
       bucketBreakdown.className = "report-day-buckets";
-      bucketBreakdown.textContent = formatBucketBreakdown(daySummaries.get(dayKey));
+      bucketBreakdown.textContent = formatTimelineDaySummary(daySummaries.get(dayKey));
       separator.append(dayLabel, bucketBreakdown);
       list.appendChild(separator);
     }
@@ -2705,7 +2705,7 @@ function appendReportTimelineText(lines, entries) {
     if (dayKey !== currentDayKey) {
       currentDayKey = dayKey;
       lines.push(formatTimelineDay(entry));
-      lines.push(`Bucket breakdown: ${formatBucketBreakdown(daySummaries.get(dayKey))}`);
+      lines.push(formatTimelineDaySummary(daySummaries.get(dayKey)));
     }
 
     lines.push(`- ${formatTimelineEntry(entry)}`);
@@ -2987,6 +2987,14 @@ function formatBucketBreakdown(summary) {
     .filter((bucket) => summary.totals[bucket] > 0)
     .map((bucket) => `${bucket}: ${formatDuration(summary.totals[bucket])} (${formatPercentage(summary.totals[bucket], summary.totalMs)})`)
     .join("; ");
+}
+
+function formatTimelineDaySummary(summary) {
+  if (!summary || summary.totalMs <= 0) {
+    return "Total: 0h 00m 00s; Bucket breakdown: No time logged.";
+  }
+
+  return `Total: ${formatDuration(summary.totalMs)}; Bucket breakdown: ${formatBucketBreakdown(summary)}`;
 }
 
 function formatTimelineDay(entry) {

@@ -51,7 +51,7 @@ Click **Generate report** to preview the aggregated report for all current time 
 
 - Bucket totals with percentages of the total report time
 - Activity totals sorted by most time, with percentages, indented objective totals, task notes, and a marker for tasks that were marked urgent
-- Timeline of worked dates and times, separated by day with a bucket breakdown summary, and listed with task, elapsed time, bucket, and urgent markers
+- Timeline of worked dates and times, separated by day with total time and a bucket breakdown summary, and listed with task, elapsed time, bucket, and urgent markers
 - Exported JSON data below the timeline
 
 You can download the report as a text file, copy it to the clipboard, or open a prefilled email draft with the report content. The **Delete logs, completed tasks, and empty activities on download** checkbox is checked by default when the report modal opens.
