@@ -1,4 +1,5 @@
 const STORAGE_KEY = "timekeeper.tasks.v1";
+const APP_TITLE = "Timekeeper";
 const BUCKETS = ["Admin", "Operations", "Projects", "Personal"];
 const DEFAULT_TIME_GOAL_MS = 8 * 60 * 60 * 1000;
 const LOG_ADJUSTMENT_MS = 60 * 1000;
@@ -21,6 +22,7 @@ let previousGoalRemainingMs = null;
 let chimeAudioContext = null;
 
 document.addEventListener("DOMContentLoaded", () => {
+  updateDocumentTitle();
   cacheElements();
   loadState();
   bindEvents();
@@ -29,6 +31,41 @@ document.addEventListener("DOMContentLoaded", () => {
   updateScrollTopButton();
   window.setInterval(tick, 1000);
 });
+
+function updateDocumentTitle() {
+  document.title = isProductionEnvironment() ? APP_TITLE : `${APP_TITLE} - Dev`;
+}
+
+function isProductionEnvironment() {
+  const { hostname, protocol } = window.location;
+  if (protocol === "file:" || !hostname) {
+    return false;
+  }
+
+  const normalizedHost = hostname.toLowerCase();
+  return !isLocalDevHost(normalizedHost);
+}
+
+function isLocalDevHost(hostname) {
+  return hostname === "localhost"
+    || hostname === "0.0.0.0"
+    || hostname === "::1"
+    || hostname.startsWith("127.")
+    || hostname.endsWith(".local")
+    || isPrivateIpv4Host(hostname);
+}
+
+function isPrivateIpv4Host(hostname) {
+  const parts = hostname.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return false;
+  }
+
+  const [first, second] = parts;
+  return first === 10
+    || (first === 172 && second >= 16 && second <= 31)
+    || (first === 192 && second === 168);
+}
 
 function cacheElements() {
   elements.board = document.getElementById("board");
