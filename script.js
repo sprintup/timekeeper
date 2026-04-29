@@ -518,7 +518,7 @@ function importDataFromText(text) {
     return;
   }
 
-  const confirmed = window.confirm("Import this Timekeeper data? This will replace the tasks, goals, logs, and time goal saved in this browser.");
+  const confirmed = window.confirm("Import this Timekeeper data? This will replace the tasks, activities, logs, and time target saved in this browser.");
   if (!confirmed) {
     return;
   }
@@ -665,12 +665,12 @@ function sanitizeRow(row, index) {
     return null;
   }
 
-  const name = String(row.name || `Goal ${index + 1}`);
-  const defaultRowMatch = name.match(/^Row (\d+)$/);
+  const name = String(row.name || `Activity ${index + 1}`);
+  const defaultRowMatch = name.match(/^(?:Row|Goal) (\d+)$/);
 
   return {
     id: String(row.id || createId()),
-    name: (defaultRowMatch ? `Goal ${defaultRowMatch[1]}` : name).slice(0, 80),
+    name: (defaultRowMatch ? `Activity ${defaultRowMatch[1]}` : name).slice(0, 80),
   };
 }
 
@@ -705,9 +705,9 @@ function render() {
     label.className = "row-label";
     label.innerHTML = `
       <span class="row-priority-label">Priority ${rowIndex + 1}</span>
-      <div class="row-priority-controls" aria-label="Goal priority controls">
-        <button class="icon-button row-priority-button" data-action="move-row-up" data-row-index="${rowIndex}" aria-label="Increase goal priority" title="Increase priority" type="button"${rowIndex === 0 ? " disabled" : ""}>&uarr;</button>
-        <button class="icon-button row-priority-button" data-action="move-row-down" data-row-index="${rowIndex}" aria-label="Decrease goal priority" title="Decrease priority" type="button"${rowIndex === rows.length - 1 ? " disabled" : ""}>&darr;</button>
+      <div class="row-priority-controls" aria-label="Activity priority controls">
+        <button class="icon-button row-priority-button" data-action="move-row-up" data-row-index="${rowIndex}" aria-label="Increase activity priority" title="Increase priority" type="button"${rowIndex === 0 ? " disabled" : ""}>&uarr;</button>
+        <button class="icon-button row-priority-button" data-action="move-row-down" data-row-index="${rowIndex}" aria-label="Decrease activity priority" title="Decrease priority" type="button"${rowIndex === rows.length - 1 ? " disabled" : ""}>&darr;</button>
       </div>
       <strong></strong>
       <div class="row-subtotal">
@@ -771,7 +771,7 @@ function getRows() {
 }
 
 function getRowName(rowIndex) {
-  return state.rows[rowIndex]?.name || `Goal ${rowIndex + 1}`;
+  return state.rows[rowIndex]?.name || `Activity ${rowIndex + 1}`;
 }
 
 function getRowIndexById(rowId) {
@@ -805,7 +805,7 @@ function createAddTaskFooter(isEmptyBoard = false) {
   button.className = "add-task-tile";
   button.dataset.action = "add-row";
   button.type = "button";
-  button.textContent = "Add Goal";
+  button.textContent = "Add Activity";
 
   footer.appendChild(button);
   return footer;
@@ -1098,7 +1098,7 @@ function renderGoalNotesModal() {
   if (noteGroups.length === 0) {
     const empty = document.createElement("p");
     empty.className = "empty-log";
-    empty.textContent = "No notes for this goal.";
+    empty.textContent = "No notes for this activity.";
     elements.goalNotesList.appendChild(empty);
     return;
   }
@@ -1402,7 +1402,7 @@ function moveRow(fromIndex, toIndex) {
   }
 
   rows.splice(toIndex, 0, movedRow);
-  state.rows.splice(toIndex, 0, movedRowMeta || createRow(`Goal ${toIndex + 1}`));
+  state.rows.splice(toIndex, 0, movedRowMeta || createRow(`Activity ${toIndex + 1}`));
   rows.forEach((row, rowIndex) => {
     row.forEach((task, orderIndex) => {
       task.row = rowIndex;
@@ -1445,7 +1445,7 @@ function syncOrderFromDom() {
 
 function openRowDialog(mode, rowIndex = "") {
   const row = Number.isFinite(rowIndex) ? state.rows[rowIndex] : null;
-  elements.rowDialogTitle.textContent = mode === "edit" ? "Rename goal" : "Add goal";
+  elements.rowDialogTitle.textContent = mode === "edit" ? "Rename activity" : "Add activity";
   elements.rowIndexInput.value = Number.isFinite(rowIndex) ? String(rowIndex) : "";
   elements.rowNameInput.value = row?.name || "";
   openDialog(elements.rowDialog);
@@ -1483,7 +1483,7 @@ function deleteRowWithPrompt(rowIndex) {
   const taskText = taskCount === 0
     ? ""
     : ` This will also delete ${taskCount} task box${taskCount === 1 ? "" : "es"} and ${taskCount === 1 ? "its" : "their"} time logs.`;
-  const confirmed = window.confirm(`Delete goal "${rowName}"?${taskText}`);
+  const confirmed = window.confirm(`Delete activity "${rowName}"?${taskText}`);
   if (!confirmed) {
     return;
   }
@@ -1522,7 +1522,7 @@ function deleteRow(rowIndex) {
 function createRow(name) {
   return {
     id: createId(),
-    name: String(name || "New Goal").slice(0, 80),
+    name: String(name || "New Activity").slice(0, 80),
   };
 }
 
@@ -2349,7 +2349,7 @@ function renderReportPreview() {
   });
 
   const goalHeading = document.createElement("h4");
-  goalHeading.textContent = "Goals";
+  goalHeading.textContent = "Activities";
   const goalList = document.createElement("ul");
   if (report.goals.length === 0) {
     const item = document.createElement("li");
@@ -2658,7 +2658,7 @@ function buildReportText(report = buildReport()) {
     lines.push(`- ${bucket} - ${formatDuration(report.totals[bucket])} (${formatPercentage(report.totals[bucket], totalMs)})`);
   });
 
-  lines.push("", "Goals");
+  lines.push("", "Activities");
 
   if (report.goals.length === 0) {
     lines.push("No time logged.");
@@ -2748,13 +2748,13 @@ function removeRowsWithoutTasks() {
 function ensureRowsForTasks() {
   const maxTaskRow = state.tasks.reduce((max, task) => Math.max(max, task.row), -1);
   for (let rowIndex = state.rows.length; rowIndex <= maxTaskRow; rowIndex += 1) {
-    state.rows.push(createRow(`Goal ${rowIndex + 1}`));
+    state.rows.push(createRow(`Activity ${rowIndex + 1}`));
   }
 }
 
 function ensureRowIndex(rowIndex) {
   for (let index = state.rows.length; index <= rowIndex; index += 1) {
-    state.rows.push(createRow(`Goal ${index + 1}`));
+    state.rows.push(createRow(`Activity ${index + 1}`));
   }
 }
 
@@ -3057,7 +3057,7 @@ function updateUrgentIndicator() {
 function updateStickyCountPills() {
   const goalCount = state.rows.length;
   const unfinishedTaskCount = state.tasks.filter((task) => task.status !== "finished").length;
-  elements.goalCountPill.textContent = `${goalCount} total goal${goalCount === 1 ? "" : "s"}`;
+  elements.goalCountPill.textContent = `${goalCount} total activit${goalCount === 1 ? "y" : "ies"}`;
   elements.unfinishedTaskCountPill.textContent = `${unfinishedTaskCount} unfinished task${unfinishedTaskCount === 1 ? "" : "s"}`;
 }
 
@@ -3072,7 +3072,7 @@ function renderGoalTotals(goals) {
   if (goals.length === 0) {
     const empty = document.createElement("p");
     empty.className = "goal-totals-empty";
-    empty.textContent = "No goal time logged.";
+    empty.textContent = "No activity time logged.";
     elements.goalTotals.appendChild(empty);
     return;
   }
@@ -3155,7 +3155,7 @@ function getTodayTotalMs() {
 
 function updateTimeGoal(totalMs) {
   if (state.timeGoalMs <= 0) {
-    elements.timeGoalRemaining.textContent = "No goal set";
+    elements.timeGoalRemaining.textContent = "No target set";
     elements.timeGoalRemaining.classList.remove("is-complete");
     previousGoalRemainingMs = null;
     return;

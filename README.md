@@ -1,68 +1,68 @@
 # Timekeeper
 
-Timekeeper is a lightweight browser-based time tracker for organizing a day of work into goals, task boxes, and time categories. It runs as a static HTML/CSS/JavaScript app and saves data in the browser with local storage.
+Timekeeper is a lightweight browser-based time tracker for organizing a day of work into activities, task boxes, and time categories. It runs as a static HTML/CSS/JavaScript app and saves data in the browser with local storage.
 
 ## User Guide
 
 ### Track Your Day
 
-Use the time pane to set a daily time goal in hours and minutes. The app shows total elapsed time, total work time excluding Personal, remaining time, bucket totals for Admin, Operations, Projects, and Personal, and goal totals ordered by priority.
+Use the time pane to set a daily time target in hours and minutes. The app shows total elapsed time, total work time excluding Personal, remaining time, bucket totals for Admin, Operations, Projects, and Personal, and activity totals ordered by priority.
 
 When remaining time reaches zero, Timekeeper plays a chime.
 
-### Goals
+### Activities
 
-Goals are the horizontal work lanes on the board. Use **Add Goal** to create a new goal, then name it for a priority, project, workstream, or outcome.
+Activities are the horizontal work lanes on the board. Use **Add Activity** to create a new activity, then name it for a priority, project, workstream, or outcome.
 
-Each goal shows:
+Each activity shows:
 
 - Priority number
-- Goal name
-- Subtotal time for all task boxes in that goal
+- Activity name
+- Subtotal time for all task boxes in that activity
 - Notes, rename, and delete controls
-- Priority arrows for moving the goal up or down
+- Priority arrows for moving the activity up or down
 
-Deleting a goal also deletes the task boxes and time logs inside that goal.
+Deleting an activity also deletes the task boxes and time logs inside that activity.
 
 ### Task Boxes
 
-Use **Add task** inside a goal to add work. Each task box has an objective and a bucket:
+Use **Add task** inside an activity to add work. Each task box has an objective and a bucket:
 
 - **Admin**: vacation, sick time, holidays, professional development, email, and meetings not tied to a project
 - **Operations**: service requests, incidents, existing responsibilities, break/fix work, and delivery support
 - **Projects**: temporary work with a start and end date that creates a unique service, product, or outcome
 - **Personal**: breaks, meals, personal time, appointments, and other time outside work categories
 
-The bucket dropdown is color coded. Drag task boxes within or across goals to reorganize the board without changing goal priority.
+The bucket dropdown is color coded. Drag task boxes within or across activities to reorganize the board without changing activity priority.
 
-Use **Urgent** on a task box to give it a red border and show a red urgent flag below the goal totals. If an urgent task is running, the task box stays green while the border remains red. Urgent tasks move left within their goal, after any running task.
+Use **Urgent** on a task box to give it a red border and show a red urgent flag below the activity totals. If an urgent task is running, the task box stays green while the border remains red. Urgent tasks move left within their activity, after any running task.
 
 ### Timers And Logs
 
-Click **Start** on a task box to begin timing, or use **Save and start** when creating a task. Starting a task moves it to the far left of its current goal without changing the goal priority. Starting another task pauses the current one. Click **Pause** to stop the active timer.
+Click **Start** on a task box to begin timing, or use **Save and start** when creating a task. Starting a task moves it to the far left of its current activity without changing the activity priority. Starting another task pauses the current one. Click **Pause** to stop the active timer.
 
 Use **Time log** to review, add, edit, delete, or nudge time entries for a task box. Time log entries include their dates. Use the Start and End `-` / `+` controls to move those timestamps by one minute. Use **Notes** to open the notes modal without finishing the task.
 
-Use **Finish** to mark a task complete and open the notes modal. Add, edit, delete, flag, or unflag notes there; finished tasks with no notes appear in reports as `finished`. Press **Finish** again on a completed task to add or manage notes. Completed task boxes move to the end of their goal and are no longer urgent. Use **Flagged** in the goal totals pane to review follow-up notes, jump back to the task notes, or unflag them. Use **Hide Finished** to hide or show finished task boxes.
+Use **Finish** to mark a task complete and open the notes modal. Add, edit, delete, flag, or unflag notes there; finished tasks with no notes appear in reports as `finished`. Press **Finish** again on a completed task to add or manage notes. Completed task boxes move to the end of their activity and are no longer urgent. Use **Flagged** in the activity totals pane to review follow-up notes, jump back to the task notes, or unflag them. Use **Hide Finished** to hide or show finished task boxes.
 
 ### Reports
 
 Click **Generate report** to preview the aggregated report for all current time logs. The top time pane still shows today's time only. The report includes:
 
 - Bucket totals with percentages of the total report time
-- Goal totals sorted by most time, with percentages, indented objective totals, task notes, and a marker for tasks that were marked urgent
+- Activity totals sorted by most time, with percentages, indented objective totals, task notes, and a marker for tasks that were marked urgent
 - Timeline of worked dates and times, separated by day with a bucket breakdown summary, and listed with task, elapsed time, bucket, and urgent markers
 - Exported JSON data below the timeline
 
-You can download the report as a text file, copy it to the clipboard, or open a prefilled email draft with the report content. The **Delete logs, completed tasks, and empty goals on download** checkbox is checked by default when the report modal opens.
+You can download the report as a text file, copy it to the clipboard, or open a prefilled email draft with the report content. The **Delete logs, completed tasks, and empty activities on download** checkbox is checked by default when the report modal opens.
 
 ### Moving Data
 
-Use **Export** to download a JSON backup of the current goals, task boxes, time logs, notes, and time goal. On another computer or browser, use **Import** and select that JSON file. Importing replaces the Timekeeper data saved in that browser.
+Use **Export** to download a JSON backup of the current activities, task boxes, time logs, notes, and time target. On another computer or browser, use **Import** and select that JSON file. Importing replaces the Timekeeper data saved in that browser.
 
 ### Reset
 
-Use **Reset** to clear all saved Timekeeper state from this browser, including goals, task boxes, time logs, and the time goal.
+Use **Reset** to clear all saved Timekeeper state from this browser, including activities, task boxes, time logs, and the time target.
 
 ## Data Storage
 

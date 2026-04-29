@@ -14,11 +14,11 @@
           <summary>Instructions</summary>
           <div class="instructions-content">
             <ol>
-              <li>Set a time goal, then use the remaining-time countdown to track progress against the day.</li>
-              <li>Add named goals for groups of work, then use Add task inside each goal. Rename or delete goals from the goal label.</li>
-              <li>Start one task at a time. Starting another task pauses the active timer and moves the task to the left of its goal.</li>
-              <li>Use Urgent on a task tile to add a red border and show the urgent flag below the goal totals.</li>
-              <li>Use the priority arrows to rearrange goals vertically, or drag task boxes within and across goals.</li>
+              <li>Set a time target, then use the remaining-time countdown to track progress against the day.</li>
+              <li>Add named activities for groups of work, then use Add task inside each activity. Rename or delete activities from the activity label.</li>
+              <li>Start one task at a time. Starting another task pauses the active timer and moves the task to the left of its activity.</li>
+              <li>Use Urgent on a task tile to add a red border and show the urgent flag below the activity totals.</li>
+              <li>Use the priority arrows to rearrange activities vertically, or drag task boxes within and across activities.</li>
               <li>Open Time log to add, edit, or nudge entries. Generate reports, or use Export and Import to move the full board between browsers.</li>
             </ol>
           </div>
@@ -50,18 +50,18 @@
               <strong id="todayWorkTime">0h 00m 00s</strong>
             </div>
             <label class="time-goal-field">
-              <span>Goal Hours</span>
+              <span>Target Hours</span>
               <input id="timeGoalHoursInput" min="0" step="1" type="number" placeholder="0">
             </label>
             <label class="time-goal-field">
-              <span>Goal Minutes</span>
+              <span>Target Minutes</span>
               <input id="timeGoalMinutesInput" max="59" min="0" step="1" type="number" placeholder="0">
             </label>
             <button class="button button-small button-secondary" type="submit">Set</button>
             <button class="button button-small" id="clearTimeGoalButton" type="button">Clear</button>
             <div class="time-meter">
               <span>Remaining</span>
-              <strong id="timeGoalRemaining">No goal set</strong>
+              <strong id="timeGoalRemaining">No target set</strong>
             </div>
           </form>
           <dl class="totals-grid" id="todayTotals">
@@ -84,7 +84,7 @@
           </dl>
         </section>
       </header>
-      <section class="goal-sticky-panel" aria-label="Goal totals">
+      <section class="goal-sticky-panel" aria-label="Activity totals">
         <div class="goal-breakdown">
           <div class="goal-totals" id="goalTotals"></div>
         </div>
@@ -93,7 +93,7 @@
             <span class="urgent-flag" aria-hidden="true"></span>
             <span id="urgentIndicatorText">Urgent tasks</span>
           </div>
-          <div class="sticky-status-pill" id="goalCountPill">0 total goals</div>
+          <div class="sticky-status-pill" id="goalCountPill">0 total activities</div>
           <div class="sticky-status-pill" id="unfinishedTaskCountPill">0 unfinished tasks</div>
           <button class="button button-secondary flagged-notes-button" id="flaggedNotesButton" type="button">Flagged</button>
           <button class="button button-secondary scroll-top-button" id="scrollTopButton" type="button" aria-label="Scroll to top" hidden>Top</button>
@@ -208,11 +208,11 @@
     <dialog class="modal" id="rowDialog">
       <form id="rowForm" method="dialog">
         <div class="modal-header">
-          <h2 id="rowDialogTitle">Add goal</h2>
+          <h2 id="rowDialogTitle">Add activity</h2>
         </div>
         <input id="rowIndexInput" type="hidden">
         <label class="field">
-          <span>Goal name</span>
+          <span>Activity name</span>
           <input id="rowNameInput" maxlength="80" required type="text">
         </label>
         <div class="modal-actions">
@@ -283,8 +283,8 @@
       <div class="modal-body">
         <div class="modal-header">
           <div>
-            <p class="eyebrow">Goal Notes</p>
-            <h2 id="goalNotesDialogTitle">Goal notes</h2>
+            <p class="eyebrow">Activity Notes</p>
+            <h2 id="goalNotesDialogTitle">Activity notes</h2>
           </div>
         </div>
         <div class="goal-notes-list" id="goalNotesList"></div>
@@ -332,7 +332,7 @@
         </label>
         <label class="checkline">
           <input id="deleteAfterReportInput" type="checkbox">
-          <span>Delete logs, completed tasks, and empty goals on download</span>
+          <span>Delete logs, completed tasks, and empty activities on download</span>
         </label>
         <div class="modal-actions">
           <button class="button button-secondary" type="button" data-action="close-report-dialog">Cancel</button>
