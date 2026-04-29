@@ -204,6 +204,16 @@ function handleDocumentClick(event) {
     return;
   }
 
+  if (action === "move-row-up") {
+    moveRowPriority(Number(actionElement.dataset.rowIndex), -1);
+    return;
+  }
+
+  if (action === "move-row-down") {
+    moveRowPriority(Number(actionElement.dataset.rowIndex), 1);
+    return;
+  }
+
   if (action === "delete-row") {
     deleteRowWithPrompt(Number(actionElement.dataset.rowIndex));
     return;
@@ -624,7 +634,10 @@ function render() {
     label.className = "row-label";
     label.innerHTML = `
       <span class="row-priority-label">Priority ${rowIndex + 1}</span>
-      <button class="drag-handle row-drag-handle" aria-label="Drag goal" title="Drag goal" type="button"></button>
+      <div class="row-priority-controls" aria-label="Goal priority controls">
+        <button class="icon-button row-priority-button" data-action="move-row-up" data-row-index="${rowIndex}" aria-label="Increase goal priority" title="Increase priority" type="button"${rowIndex === 0 ? " disabled" : ""}>&uarr;</button>
+        <button class="icon-button row-priority-button" data-action="move-row-down" data-row-index="${rowIndex}" aria-label="Decrease goal priority" title="Decrease priority" type="button"${rowIndex === rows.length - 1 ? " disabled" : ""}>&darr;</button>
+      </div>
       <strong></strong>
       <div class="row-subtotal">
         <span>Subtotal</span>
@@ -637,7 +650,6 @@ function render() {
     `;
     label.querySelector("strong").textContent = getRowName(rowIndex);
     label.querySelector("[data-row-subtotal-index]").textContent = formatDuration(getRowElapsed(rowIndex));
-    label.querySelector(".row-drag-handle").addEventListener("pointerdown", handleRowPointerDown);
 
     const track = document.createElement("div");
     track.className = "task-track";
@@ -743,9 +755,33 @@ function createTaskCard(task) {
   urgentButton.classList.toggle("is-active", task.urgent);
   urgentButton.setAttribute("aria-pressed", String(task.urgent));
   timeLogButton.textContent = `Show time log (${task.logs.length})`;
-  notesButton.textContent = `Show notes (${task.finishNotes.length})`;
+  renderTaskNotesButton(notesButton, task);
 
   return fragment;
+}
+
+function renderTaskNotesButton(button, task) {
+  const label = `Show notes (${task.finishNotes.length})`;
+  const hasFlaggedNote = taskHasFlaggedNotes(task);
+  button.textContent = label;
+  button.classList.toggle("has-flagged-note", hasFlaggedNote);
+  button.setAttribute(
+    "aria-label",
+    hasFlaggedNote ? `${label}, includes flagged note` : label,
+  );
+
+  if (!hasFlaggedNote) {
+    return;
+  }
+
+  const flag = document.createElement("span");
+  flag.className = "urgent-flag note-flag-indicator";
+  flag.setAttribute("aria-hidden", "true");
+  button.appendChild(flag);
+}
+
+function taskHasFlaggedNotes(task) {
+  return Array.isArray(task.finishNotes) && task.finishNotes.some((note) => note.flagged);
 }
 
 function renderTimeLogModal() {
@@ -1163,6 +1199,20 @@ function getRowFromPoint(x, y) {
   return document.elementsFromPoint(x, y)
     .map((element) => element.closest?.(".task-row"))
     .find(Boolean);
+}
+
+function moveRowPriority(rowIndex, direction) {
+  if (!Number.isInteger(rowIndex) || !Number.isInteger(direction)) {
+    return;
+  }
+
+  const targetIndex = rowIndex + direction;
+  if (targetIndex < 0 || targetIndex >= state.rows.length) {
+    return;
+  }
+
+  moveRow(rowIndex, targetIndex);
+  render();
 }
 
 function moveRow(fromIndex, toIndex) {
@@ -2061,11 +2111,12 @@ function renderReportPreview() {
   summaryHeading.textContent = "Summary";
 
   const totals = document.createElement("dl");
+  const totalMs = getReportTotalMs(report);
   getBucketsByTotal(report.totals).forEach((bucket) => {
     const term = document.createElement("dt");
     const detail = document.createElement("dd");
     term.textContent = bucket;
-    detail.textContent = formatDuration(report.totals[bucket]);
+    detail.textContent = `${formatDuration(report.totals[bucket])} (${formatPercentage(report.totals[bucket], totalMs)})`;
     totals.append(term, detail);
   });
 
@@ -2116,16 +2167,13 @@ function renderReportPreview() {
   const timelineHeading = document.createElement("h4");
   timelineHeading.textContent = "Timeline";
   const timelineList = document.createElement("ul");
+  timelineList.className = "report-timeline-list";
   if (report.timeline.length === 0) {
     const item = document.createElement("li");
     item.textContent = "No time logged.";
     timelineList.appendChild(item);
   } else {
-    report.timeline.forEach((entry) => {
-      const item = document.createElement("li");
-      item.textContent = formatTimelineEntry(entry);
-      timelineList.appendChild(item);
-    });
+    renderReportTimelinePreview(timelineList, report.timeline);
   }
 
   elements.reportPreview.append(heading, summaryHeading, totals, goalHeading, goalList, timelineHeading, timelineList);
@@ -2136,6 +2184,25 @@ function renderReportPreview() {
   exportData.className = "report-export-data";
   exportData.textContent = JSON.stringify(report.exportedData, null, 2);
   elements.reportPreview.append(exportHeading, exportData);
+}
+
+function renderReportTimelinePreview(list, entries) {
+  let currentDayKey = "";
+
+  entries.forEach((entry) => {
+    const dayKey = getTimelineEntryDayKey(entry);
+    if (dayKey !== currentDayKey) {
+      currentDayKey = dayKey;
+      const separator = document.createElement("li");
+      separator.className = "report-day-separator";
+      separator.textContent = formatTimelineDay(entry);
+      list.appendChild(separator);
+    }
+
+    const item = document.createElement("li");
+    item.textContent = formatTimelineEntry(entry);
+    list.appendChild(item);
+  });
 }
 
 function downloadReportFromDialog(event) {
@@ -2168,7 +2235,7 @@ function emailReportFromDialog() {
 
   const recipient = elements.reportEmailInput.value.trim();
   const report = buildReport();
-  const subject = `Timekeeper Report - ${report.startDate} to ${report.endDate}`;
+  const subject = `Timekeeper Aggregated Report - ${report.startDate} to ${report.endDate}`;
   const body = buildReportText(report);
   const mailtoUrl = `mailto:${encodeURIComponent(recipient)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 
@@ -2245,9 +2312,9 @@ function setCopyReportStatus(message) {
   elements.copyReportStatus.hidden = !message;
 }
 
-function buildReport() {
-  const reportStart = startOfToday();
-  const reportEnd = new Date();
+function buildReport(options = {}) {
+  const reportEnd = getReportBoundaryDate(options.end, new Date());
+  const reportStart = getReportBoundaryDate(options.start, null) || getAggregatedReportStart(reportEnd);
   const totals = Object.fromEntries(BUCKETS.map((bucket) => [bucket, 0]));
   const goalTotals = new Map();
   const goalObjectives = new Map();
@@ -2282,10 +2349,49 @@ function buildReport() {
     startDate: formatFileDate(reportStart),
     endDate: formatFileDate(reportEnd),
     totals,
+    totalMs: BUCKETS.reduce((total, bucket) => total + totals[bucket], 0),
     goals: buildGoalReportEntries(goalTotals, goalObjectives),
     timeline: timeline.sort((a, b) => a.sortTime - b.sortTime),
     exportedData: createExportPayload(reportEnd),
   };
+}
+
+function buildTodayReport() {
+  return buildReport({ start: startOfToday(), end: new Date() });
+}
+
+function getReportBoundaryDate(value, fallback) {
+  if (!value) {
+    return fallback;
+  }
+
+  const date = value instanceof Date ? new Date(value) : new Date(value);
+  return Number.isNaN(date.getTime()) ? fallback : date;
+}
+
+function getAggregatedReportStart(reportEnd = new Date()) {
+  const endTime = reportEnd.getTime();
+  const logTimes = state.tasks
+    .flatMap((task) => task.logs.map(getLogReportStartTime))
+    .filter((time) => Number.isFinite(time) && time <= endTime);
+
+  if (logTimes.length === 0) {
+    return startOfToday();
+  }
+
+  return new Date(Math.min(...logTimes));
+}
+
+function getLogReportStartTime(log) {
+  if (log.manual) {
+    return new Date(log.createdAt || Date.now()).getTime();
+  }
+
+  if (log.start) {
+    return new Date(log.start).getTime();
+  }
+
+  return new Date(log.createdAt || Date.now()).getTime();
 }
 
 function buildGoalReportEntries(goalTotals, goalObjectives) {
@@ -2304,14 +2410,15 @@ function buildGoalReportEntries(goalTotals, goalObjectives) {
 
 function buildReportText(report = buildReport()) {
   const lines = [
-    "Timekeeper Report",
+    "Timekeeper Aggregated Report",
     `Date range: ${report.rangeLabel}`,
     "",
     "Summary",
   ];
 
+  const totalMs = getReportTotalMs(report);
   getBucketsByTotal(report.totals).forEach((bucket) => {
-    lines.push(`${bucket} - ${formatDuration(report.totals[bucket])}`);
+    lines.push(`- ${bucket} - ${formatDuration(report.totals[bucket])} (${formatPercentage(report.totals[bucket], totalMs)})`);
   });
 
   lines.push("", "Goals");
@@ -2320,11 +2427,11 @@ function buildReportText(report = buildReport()) {
     lines.push("No time logged.");
   } else {
     report.goals.forEach((goal) => {
-      lines.push(`${goal.label} - ${formatDuration(goal.durationMs)}`);
+      lines.push(`- ${goal.label} - ${formatDuration(goal.durationMs)}`);
       goal.objectives.forEach((objective) => {
-        lines.push(`  ${objective.objective}${formatUrgentReportLabel(objective)} (${objective.bucket}) - ${formatDuration(objective.durationMs)}`);
+        lines.push(`  - ${objective.objective}${formatUrgentReportLabel(objective)} (${objective.bucket}) - ${formatDuration(objective.durationMs)}`);
         objective.notes.forEach((note) => {
-          lines.push(`    ${note}`);
+          lines.push(`    - ${note}`);
         });
       });
     });
@@ -2335,14 +2442,26 @@ function buildReportText(report = buildReport()) {
   if (report.timeline.length === 0) {
     lines.push("No time logged.");
   } else {
-    report.timeline.forEach((entry) => {
-      lines.push(formatTimelineEntry(entry));
-    });
+    appendReportTimelineText(lines, report.timeline);
   }
 
   lines.push("", "Exported Data", JSON.stringify(report.exportedData, null, 2));
 
   return `${lines.join("\n")}\n`;
+}
+
+function appendReportTimelineText(lines, entries) {
+  let currentDayKey = "";
+
+  entries.forEach((entry) => {
+    const dayKey = getTimelineEntryDayKey(entry);
+    if (dayKey !== currentDayKey) {
+      currentDayKey = dayKey;
+      lines.push(formatTimelineDay(entry));
+    }
+
+    lines.push(`- ${formatTimelineEntry(entry)}`);
+  });
 }
 
 function getReportFileName(report) {
@@ -2450,11 +2569,11 @@ function getLogDuration(log, now = new Date()) {
 function formatLogLabel(log) {
   const duration = formatDuration(getLogDuration(log));
   if (log.manual) {
-    return `Manually added - ${duration}`;
+    return `Manually added at ${formatDateTime(log.createdAt || new Date())} - ${duration}`;
   }
 
-  const start = log.start ? formatTime(log.start) : "No start";
-  const end = log.end ? formatTime(log.end) : "Running";
+  const start = log.start ? formatDateTime(log.start) : "No start";
+  const end = log.end ? formatDateTime(log.end) : "Running";
   return `${start} - ${end} (${duration})`;
 }
 
@@ -2490,6 +2609,14 @@ function getTaskReportNotes(task) {
   return task.status === "finished" || task.finishedAt ? ["finished"] : [];
 }
 
+function getReportTotalMs(report) {
+  if (Number.isFinite(report.totalMs)) {
+    return report.totalMs;
+  }
+
+  return BUCKETS.reduce((total, bucket) => total + (report.totals[bucket] || 0), 0);
+}
+
 function wasTaskEverUrgent(task) {
   return task.wasUrgent === true || task.urgent === true;
 }
@@ -2509,7 +2636,7 @@ function getLogDurationWithinRange(log, reportStart, reportEnd) {
   }
 
   const logStart = new Date(log.start);
-  const logEnd = log.end ? new Date(log.end) : new Date();
+  const logEnd = log.end ? new Date(log.end) : reportEnd;
   const overlapStart = Math.max(logStart.getTime(), reportStart.getTime());
   const overlapEnd = Math.min(logEnd.getTime(), reportEnd.getTime());
   return Math.max(0, overlapEnd - overlapStart);
@@ -2523,7 +2650,7 @@ function formatReportLogLabel(log, durationMs, reportStart, reportEnd) {
   }
 
   const start = new Date(Math.max(new Date(log.start).getTime(), reportStart.getTime()));
-  const sourceEnd = log.end ? new Date(log.end) : new Date();
+  const sourceEnd = log.end ? new Date(log.end) : reportEnd;
   const end = new Date(Math.min(sourceEnd.getTime(), reportEnd.getTime()));
   return `${formatDateTime(start)} - ${log.end ? formatDateTime(end) : "Running"} (${duration})`;
 }
@@ -2540,7 +2667,7 @@ function getReportLogWindow(log, reportStart, reportEnd) {
   }
 
   const start = new Date(Math.max(new Date(log.start).getTime(), reportStart.getTime()));
-  const sourceEnd = log.end ? new Date(log.end) : new Date();
+  const sourceEnd = log.end ? new Date(log.end) : reportEnd;
   const end = new Date(Math.min(sourceEnd.getTime(), reportEnd.getTime()));
   return {
     start,
@@ -2554,6 +2681,19 @@ function formatTimelineEntry(entry) {
     ? `${formatDateTime(entry.start)} - ${entry.end ? formatDateTime(entry.end) : "Running"}`
     : entry.label.replace(/\s+\(.+\)$/, "");
   return `${timeRange} (${formatDuration(entry.durationMs)}) | ${entry.objective}${formatUrgentReportLabel(entry)} | ${entry.bucket}`;
+}
+
+function getTimelineEntryDayKey(entry) {
+  return formatFileDate(new Date(entry.sortTime));
+}
+
+function formatTimelineDay(entry) {
+  return new Intl.DateTimeFormat(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(entry.sortTime));
 }
 
 function tick() {
@@ -2582,7 +2722,7 @@ function tick() {
 }
 
 function updateTodayTotals() {
-  const report = buildReport();
+  const report = buildTodayReport();
   const totalMs = BUCKETS.reduce((total, bucket) => total + report.totals[bucket], 0);
   const workMs = BUCKETS
     .filter((bucket) => bucket !== "Personal")
@@ -2708,7 +2848,7 @@ function updateScrollTopButton() {
 }
 
 function getTodayTotalMs() {
-  const report = buildReport();
+  const report = buildTodayReport();
   return BUCKETS.reduce((total, bucket) => total + report.totals[bucket], 0);
 }
 
@@ -2763,6 +2903,14 @@ function formatDuration(ms) {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
   return `${hours}h ${String(minutes).padStart(2, "0")}m ${String(seconds).padStart(2, "0")}s`;
+}
+
+function formatPercentage(part, total) {
+  if (!Number.isFinite(part) || !Number.isFinite(total) || total <= 0) {
+    return "0%";
+  }
+
+  return `${((part / total) * 100).toFixed(1).replace(/\.0$/, "")}%`;
 }
 
 function setTimeGoalInputs(ms) {
