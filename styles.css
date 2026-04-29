@@ -612,7 +612,8 @@ summary:focus-visible {
 
 .row-priority-controls {
   display: grid;
-  grid-template-columns: repeat(2, 34px);
+  grid-template-columns: repeat(2, 34px) auto;
+  align-items: start;
   gap: 6px;
 }
 
@@ -648,6 +649,14 @@ summary:focus-visible {
   font-size: 0.9rem;
 }
 
+.row-task-counts {
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .row-label-actions {
   display: flex;
   flex-direction: column;
@@ -657,16 +666,9 @@ summary:focus-visible {
 
 .row-add-task-button,
 .row-notes-button,
-.row-edit-button,
-.row-delete-button {
+.row-edit-button {
   align-self: start;
   padding: 0 10px;
-}
-
-.row-delete-button {
-  background: #fff1f1;
-  border-color: #a84d4d;
-  color: #7b2323;
 }
 
 .task-track {
@@ -909,7 +911,8 @@ body.is-board-dragging * {
   white-space: normal;
 }
 
-.notes-button.has-flagged-note {
+.notes-button.has-flagged-note,
+.row-notes-button.has-flagged-note {
   gap: 8px;
   border-color: var(--red);
 }

@@ -115,6 +115,7 @@ function cacheElements() {
   elements.rowDialogTitle = document.getElementById("rowDialogTitle");
   elements.rowIndexInput = document.getElementById("rowIndexInput");
   elements.rowNameInput = document.getElementById("rowNameInput");
+  elements.deleteRowDialogButton = document.getElementById("deleteRowDialogButton");
 
   elements.logDialog = document.getElementById("logDialog");
   elements.logForm = document.getElementById("logForm");
@@ -268,8 +269,11 @@ function handleDocumentClick(event) {
     return;
   }
 
-  if (action === "delete-row") {
-    deleteRowWithPrompt(Number(actionElement.dataset.rowIndex));
+  if (action === "delete-row-from-dialog") {
+    const rowIndex = Number(elements.rowIndexInput.value);
+    if (deleteRowWithPrompt(rowIndex)) {
+      closeDialog(elements.rowDialog);
+    }
     return;
   }
 
@@ -697,6 +701,9 @@ function render() {
   const rows = getRows();
   rows.forEach((tasks, rowIndex) => {
     const goalNoteCount = getGoalNoteCount(tasks);
+    const goalHasFlaggedNotes = tasks.some(taskHasFlaggedNotes);
+    const unfinishedTaskCount = tasks.filter((task) => task.status !== "finished").length;
+    const finishedTaskCount = tasks.length - unfinishedTaskCount;
     const row = document.createElement("section");
     row.className = "task-row";
     row.dataset.rowIndex = String(rowIndex);
@@ -708,17 +715,23 @@ function render() {
       <div class="row-priority-controls" aria-label="Activity priority controls">
         <button class="icon-button row-priority-button" data-action="move-row-up" data-row-index="${rowIndex}" aria-label="Increase activity priority" title="Increase priority" type="button"${rowIndex === 0 ? " disabled" : ""}>&uarr;</button>
         <button class="icon-button row-priority-button" data-action="move-row-down" data-row-index="${rowIndex}" aria-label="Decrease activity priority" title="Decrease priority" type="button"${rowIndex === rows.length - 1 ? " disabled" : ""}>&darr;</button>
+        <button class="icon-button row-edit-button" data-action="edit-row" data-row-index="${rowIndex}" type="button">Edit</button>
       </div>
       <strong></strong>
       <div class="row-subtotal">
         <span>Subtotal</span>
         <strong data-row-subtotal-index="${rowIndex}"></strong>
       </div>
+      <div class="row-task-counts" aria-label="Activity task counts">
+        <span>${formatTaskCount(unfinishedTaskCount, "unfinished")}</span>
+        <span>${formatTaskCount(finishedTaskCount, "finished")}</span>
+      </div>
       <div class="row-label-actions">
         <button class="icon-button row-add-task-button" data-action="add-side-quest" data-row-index="${rowIndex}" type="button">Add task</button>
-        <button class="icon-button row-notes-button" data-action="show-goal-notes" data-row-index="${rowIndex}" type="button">Notes (${goalNoteCount})</button>
-        <button class="icon-button row-edit-button" data-action="edit-row" data-row-index="${rowIndex}" type="button">Rename</button>
-        <button class="icon-button row-delete-button" data-action="delete-row" data-row-index="${rowIndex}" type="button">Delete</button>
+        <button class="icon-button row-notes-button${goalHasFlaggedNotes ? " has-flagged-note" : ""}" data-action="show-goal-notes" data-row-index="${rowIndex}" aria-label="${goalHasFlaggedNotes ? `Notes (${goalNoteCount}), includes flagged note` : `Notes (${goalNoteCount})`}" type="button">
+          <span>Notes (${goalNoteCount})</span>
+          ${goalHasFlaggedNotes ? '<span class="urgent-flag note-flag-indicator" aria-hidden="true"></span>' : ""}
+        </button>
       </div>
     `;
     label.querySelector("strong").textContent = getRowName(rowIndex);
@@ -784,6 +797,10 @@ function getRowIndexById(rowId) {
 
 function getGoalNoteCount(tasks) {
   return tasks.reduce((total, task) => total + (task.finishNotes?.length || 0), 0);
+}
+
+function formatTaskCount(count, statusLabel) {
+  return `${count} ${statusLabel} task${count === 1 ? "" : "s"}`;
 }
 
 function createAddTaskFooter(isEmptyBoard = false) {
@@ -1430,9 +1447,10 @@ function syncOrderFromDom() {
 
 function openRowDialog(mode, rowIndex = "") {
   const row = Number.isFinite(rowIndex) ? state.rows[rowIndex] : null;
-  elements.rowDialogTitle.textContent = mode === "edit" ? "Rename activity" : "Add activity";
+  elements.rowDialogTitle.textContent = mode === "edit" ? "Edit activity" : "Add activity";
   elements.rowIndexInput.value = Number.isFinite(rowIndex) ? String(rowIndex) : "";
   elements.rowNameInput.value = row?.name || "";
+  elements.deleteRowDialogButton.hidden = mode !== "edit" || !row;
   openDialog(elements.rowDialog);
   elements.rowNameInput.focus();
 }
@@ -1459,7 +1477,7 @@ function saveRowFromDialog(event) {
 
 function deleteRowWithPrompt(rowIndex) {
   if (!Number.isInteger(rowIndex) || !state.rows[rowIndex]) {
-    return;
+    return false;
   }
 
   const rowName = getRowName(rowIndex);
@@ -1470,10 +1488,11 @@ function deleteRowWithPrompt(rowIndex) {
     : ` This will also delete ${taskCount} task box${taskCount === 1 ? "" : "es"} and ${taskCount === 1 ? "its" : "their"} time logs.`;
   const confirmed = window.confirm(`Delete activity "${rowName}"?${taskText}`);
   if (!confirmed) {
-    return;
+    return false;
   }
 
   deleteRow(rowIndex);
+  return true;
 }
 
 function deleteRow(rowIndex) {
@@ -2550,7 +2569,7 @@ function buildReport(options = {}) {
     const currentGoalMs = goalTotals.get(task.row) || 0;
     goalTotals.set(task.row, currentGoalMs + durationMs);
     timeline.push(...logEntries);
-    if (durationMs > 0) {
+    if (shouldIncludeReportObjective(task, durationMs)) {
       const objectives = goalObjectives.get(task.row) || [];
       objectives.push({
         objective: task.objective,
@@ -2626,8 +2645,12 @@ function buildGoalReportEntries(goalTotals, goalObjectives) {
       hasRunning: state.tasks.some((task) => task.row === rowIndex && isTaskRunning(task)),
       objectives: goalObjectives.get(rowIndex) || [],
     }))
-    .filter((entry) => entry.durationMs > 0 || entry.hasUrgent || entry.hasRunning)
+    .filter((entry) => entry.durationMs > 0 || entry.hasUrgent || entry.hasRunning || entry.objectives.length > 0)
     .sort((a, b) => b.durationMs - a.durationMs || a.rowIndex - b.rowIndex);
+}
+
+function shouldIncludeReportObjective(task, durationMs) {
+  return durationMs > 0 || task.logs.length === 0;
 }
 
 function buildReportText(report = buildReport()) {

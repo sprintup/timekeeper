@@ -15,7 +15,7 @@
           <div class="instructions-content">
             <ol>
               <li>Set a time target, then use the remaining-time countdown to track progress against the day.</li>
-              <li>Add named activities for groups of work, then use Add task inside each activity. Rename or delete activities from the activity label.</li>
+              <li>Add named activities for groups of work, then use Add task inside each activity. Edit activities from their priority controls.</li>
               <li>Start one task at a time. Starting another task pauses the active timer and moves the task to the left of its activity.</li>
               <li>Use Urgent on a task tile to add a red border and show the urgent flag below the activity totals.</li>
               <li>Use the priority arrows to rearrange activities vertically, or drag task boxes within and across activities.</li>
@@ -217,6 +217,7 @@
         </label>
         <div class="modal-actions">
           <button class="button button-secondary" type="button" data-action="close-row-dialog">Cancel</button>
+          <button class="button button-danger" id="deleteRowDialogButton" type="button" data-action="delete-row-from-dialog" hidden>Delete</button>
           <button class="button button-primary" type="submit">Save</button>
         </div>
       </form>
