@@ -140,6 +140,7 @@ function cacheElements() {
   elements.finishNoteIdInput = document.getElementById("finishNoteIdInput");
   elements.finishNoteInput = document.getElementById("finishNoteInput");
   elements.finishNoteSubmitButton = document.getElementById("finishNoteSubmitButton");
+  elements.finishNoteCloseButton = document.getElementById("finishNoteCloseButton");
   elements.cancelFinishNoteButton = document.getElementById("cancelFinishNoteButton");
 
   elements.flaggedNotesDialog = document.getElementById("flaggedNotesDialog");
@@ -1093,9 +1094,11 @@ function resetFinishNoteForm() {
 }
 
 function updateCancelFinishNoteButton(taskId, noteId = "") {
-  elements.cancelFinishNoteButton.hidden = !pendingFinishCancelSnapshot
-    || pendingFinishCancelSnapshot.taskId !== taskId
-    || Boolean(noteId);
+  const isFinishingTask = Boolean(pendingFinishCancelSnapshot)
+    && pendingFinishCancelSnapshot.taskId === taskId
+    && !noteId;
+  elements.cancelFinishNoteButton.hidden = !isFinishingTask;
+  elements.finishNoteCloseButton.textContent = isFinishingTask ? "Finish" : "Close";
 }
 
 function toggleFinishNoteFlag(taskId, noteId) {

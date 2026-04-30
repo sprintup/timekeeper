@@ -235,9 +235,9 @@
         </div>
         <div class="time-log-list" id="timeLogList"></div>
         <div class="modal-actions">
-          <button class="button button-secondary" type="button" data-action="close-time-log-dialog">Close</button>
           <button class="button button-secondary" type="button" data-action="show-active-notes">Notes</button>
-          <button class="button button-primary" type="button" data-action="add-log-from-manager">Add time</button>
+          <button class="button button-secondary" type="button" data-action="add-log-from-manager">Add time</button>
+          <button class="button button-primary" type="button" data-action="close-time-log-dialog">Close</button>
         </div>
       </div>
     </dialog>
@@ -262,7 +262,7 @@
             <button class="button button-secondary" id="cancelFinishNoteButton" type="button" data-action="cancel-finish-note-dialog" hidden>Cancel</button>
             <button class="button button-secondary" type="button" data-action="show-active-time-log">Time log</button>
             <button class="button button-secondary" id="finishNoteSubmitButton" type="submit">Add note</button>
-            <button class="button button-primary" type="button" data-action="close-finish-note-dialog">Close</button>
+            <button class="button button-primary" id="finishNoteCloseButton" type="button" data-action="close-finish-note-dialog">Close</button>
           </div>
         </form>
       </div>
