@@ -6,7 +6,7 @@ Timekeeper is a lightweight browser-based time tracker for organizing a day of w
 
 ### Track Your Day
 
-Use the time pane to set a daily time target in hours and minutes. The app shows total elapsed time, total work time excluding Personal, remaining time, bucket totals for Admin, Operations, Projects, and Personal, and activity totals ordered by priority.
+Use the time pane to set a daily time target in hours and minutes. The app shows total elapsed time, total work time excluding Personal, remaining time, bucket totals for Admin, Operations, Projects, and Personal, and all activity totals ordered by priority.
 
 When remaining time reaches zero, Timekeeper plays a chime.
 
@@ -50,11 +50,11 @@ Use **Finish** to mark a task complete and open the notes modal. Add, edit, dele
 Click **Generate report** to preview the aggregated report for all current time logs. The top time pane still shows today's time only. The report includes:
 
 - Bucket totals with percentages of the total report time
-- Activity totals sorted by most time, with percentages, Markdown activity headings, task notes, finished markers in task lines, and a marker for tasks that were marked urgent
+- Activity totals sorted by most time, with percentages, Markdown activity headings, task notes, flagged note markers, finished markers in task lines, and a marker for tasks that were marked urgent
 - Timeline of worked dates and times, separated by day with total time and a bucket breakdown summary, and listed with task, elapsed time, bucket, and urgent markers
 - Exported JSON data below the timeline
 
-You can download the report as a Markdown file, copy it to the clipboard, or open a prefilled email draft with the report content. The **Delete logs, completed tasks, and empty activities on download** checkbox is checked by default when the report modal opens.
+You can download the report as a Markdown file, copy it to the clipboard, or open a prefilled email draft with the report content. The **Delete logs and completed tasks on download** checkbox is checked by default when the report modal opens.
 
 ### Moving Data
 
@@ -66,7 +66,7 @@ Use **Reset** to clear all saved Timekeeper state from this browser, including a
 
 ## Data Storage
 
-Timekeeper stores data in browser local storage. Data stays on the current browser and device unless you download, email, or manually save a report elsewhere.
+Timekeeper stores data in browser local storage. Data stays on the current browser and device unless you download, email, or manually save a report elsewhere. Deleting cookies and site data for this site deletes all details, so it is best to run Timekeeper on a side computer or export backups before clearing site data.
 
 ## Running Locally
 

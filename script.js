@@ -2279,7 +2279,6 @@ function deleteTimeLogsAndCompletedTasks() {
     task.logs = [];
   });
   state.tasks = state.tasks.filter((task) => task.status !== "finished");
-  removeRowsWithoutTasks();
   normalizeBoard();
   saveState();
 
@@ -2837,25 +2836,6 @@ function normalizeBoard() {
   });
 }
 
-function removeRowsWithoutTasks() {
-  ensureRowsForTasks();
-  const rowsWithTasks = new Set(state.tasks.map((task) => task.row));
-  const rowIndexMap = new Map();
-
-  state.rows = state.rows.filter((row, rowIndex) => {
-    if (!rowsWithTasks.has(rowIndex)) {
-      return false;
-    }
-
-    rowIndexMap.set(rowIndex, rowIndexMap.size);
-    return true;
-  });
-
-  state.tasks.forEach((task) => {
-    task.row = rowIndexMap.get(task.row) ?? task.row;
-  });
-}
-
 function ensureRowsForTasks() {
   const maxTaskRow = state.tasks.reduce((max, task) => Math.max(max, task.row), -1);
   for (let rowIndex = state.rows.length; rowIndex <= maxTaskRow; rowIndex += 1) {
@@ -2970,7 +2950,9 @@ function createReportLogEntry(log, task, reportStart, reportEnd) {
 
 function getTaskReportNotes(task) {
   return Array.isArray(task.finishNotes)
-    ? task.finishNotes.map((note) => note.text).filter(Boolean)
+    ? task.finishNotes
+      .filter((note) => note.text)
+      .map((note) => `${note.flagged ? "[Flagged] " : ""}${note.text}`)
     : [];
 }
 
@@ -3154,7 +3136,7 @@ function updateTodayTotals() {
     elements.bucketTotalElements[bucket].textContent = formatDuration(report.totals[bucket]);
   });
   renderBucketTotals(report.totals);
-  renderGoalTotals(getGoalsByPriority(report.goals));
+  renderGoalTotals(getActivityPaneGoals(report.goals));
   updateTimeGoal(totalMs);
 }
 
@@ -3162,8 +3144,19 @@ function getBucketsByTotal(totals) {
   return [...BUCKETS].sort((a, b) => (totals[b] || 0) - (totals[a] || 0) || BUCKETS.indexOf(a) - BUCKETS.indexOf(b));
 }
 
-function getGoalsByPriority(goals) {
-  return [...goals].sort((a, b) => a.rowIndex - b.rowIndex);
+function getActivityPaneGoals(reportGoals) {
+  const reportGoalsByRow = new Map(reportGoals.map((goal) => [goal.rowIndex, goal]));
+  return state.rows.map((_, rowIndex) => {
+    const reportGoal = reportGoalsByRow.get(rowIndex);
+    return {
+      rowIndex,
+      label: getRowName(rowIndex),
+      durationMs: reportGoal?.durationMs || 0,
+      hasUrgent: state.tasks.some((task) => task.row === rowIndex && task.urgent),
+      hasRunning: state.tasks.some((task) => task.row === rowIndex && isTaskRunning(task)),
+      objectives: reportGoal?.objectives || [],
+    };
+  });
 }
 
 function renderBucketTotals(totals) {
@@ -3202,7 +3195,7 @@ function renderGoalTotals(goals) {
   if (goals.length === 0) {
     const empty = document.createElement("p");
     empty.className = "goal-totals-empty";
-    empty.textContent = "No activity time logged.";
+    empty.textContent = "No activities yet.";
     elements.goalTotals.appendChild(empty);
     return;
   }
