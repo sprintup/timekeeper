@@ -109,6 +109,7 @@ function cacheElements() {
   elements.bucketInput = document.getElementById("bucketInput");
   elements.taskCategoryGuide = document.getElementById("taskCategoryGuide");
   elements.deleteTaskDialogButton = document.getElementById("deleteTaskDialogButton");
+  elements.saveUrgentTaskDialogButton = document.getElementById("saveUrgentTaskDialogButton");
 
   elements.rowDialog = document.getElementById("rowDialog");
   elements.rowForm = document.getElementById("rowForm");
@@ -1639,6 +1640,7 @@ function openTaskDialog(mode, placement, task = null, rowIndex = "") {
   elements.objectiveInput.value = task?.objective || "";
   elements.bucketInput.value = task?.bucket || "";
   elements.deleteTaskDialogButton.hidden = mode !== "edit" || !task;
+  elements.saveUrgentTaskDialogButton.hidden = mode === "edit";
   elements.taskCategoryGuide.hidden = placement !== "side";
   elements.taskCategoryGuide.open = placement === "side";
   openDialog(elements.taskDialog);
@@ -1653,7 +1655,9 @@ function saveTaskFromDialog(event) {
   const rowIndex = elements.taskRowInput.value === "" ? null : Number(elements.taskRowInput.value);
   const objective = elements.objectiveInput.value.trim();
   const bucket = elements.bucketInput.value;
-  const shouldStart = event.submitter?.value === "save-start";
+  const submitAction = event.submitter?.value || "save";
+  const shouldStart = submitAction === "save-start";
+  const shouldSaveUrgent = submitAction === "save-urgent";
   let savedTask = null;
 
   if (!objective || !BUCKETS.includes(bucket)) {
@@ -1670,6 +1674,11 @@ function saveTaskFromDialog(event) {
   } else {
     savedTask = createTask({ objective, bucket, placement, rowIndex });
     state.tasks.push(savedTask);
+  }
+
+  if (shouldSaveUrgent && savedTask && savedTask.status !== "finished") {
+    savedTask.urgent = true;
+    savedTask.wasUrgent = true;
   }
 
   if (shouldStart && savedTask && !isTaskRunning(savedTask)) {

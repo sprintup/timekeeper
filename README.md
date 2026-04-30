@@ -39,7 +39,7 @@ Use **Urgent** on a task box to give it a red border and show a red urgent flag 
 
 ### Timers And Logs
 
-Click **Start** on a task box to begin timing, or use **Save and start** when creating a task. Starting a task moves it to the far left of its current activity without changing the activity priority. Starting another task pauses the current one. Click **Pause** to stop the active timer.
+Click **Start** on a task box to begin timing, or use **Start** when creating a task. Use **Save as Urgent** to create a task already marked urgent. Starting a task moves it to the far left of its current activity without changing the activity priority. Starting another task pauses the current one. Click **Pause** to stop the active timer.
 
 Use **Time log** to review, add, edit, delete, or nudge time entries for a task box. Time log entries include their dates. Use the Start and End `-` / `+` controls to move those timestamps by one minute. Use **Notes** to open the notes modal without finishing the task.
 

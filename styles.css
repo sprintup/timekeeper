@@ -54,6 +54,10 @@ button {
   cursor: pointer;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 .app-shell {
   width: min(1500px, calc(100% - 32px));
   margin: 0 auto;
