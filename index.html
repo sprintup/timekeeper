@@ -36,6 +36,7 @@
         <div class="header-actions actions-panel" aria-label="Report actions">
           <button class="button button-primary" id="standupSummaryButton" type="button">Standup Summary</button>
           <button class="button button-secondary" id="generateReportButton" type="button">Manager's Report</button>
+          <button class="button button-secondary" id="clearCompletedButton" type="button" hidden aria-hidden="true" tabindex="-1">Hide Finished</button>
           <button class="button button-secondary" id="exportDataButton" type="button">Export</button>
           <button class="button button-secondary" id="importDataButton" type="button">Import</button>
           <input id="importDataInput" type="file" accept="application/json,.json" hidden>
@@ -384,6 +385,6 @@
         </div>
       </div>
     </dialog>
-    <script src="script.js"></script>
+    <script src="script.js?v=20260430-standup-compat"></script>
   </body>
 </html>

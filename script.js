@@ -166,7 +166,7 @@ function cacheElements() {
 
 function bindEvents() {
   elements.generateReportButton.addEventListener("click", openReportDialog);
-  elements.standupSummaryButton.addEventListener("click", openStandupSummaryDialog);
+  elements.standupSummaryButton?.addEventListener("click", openStandupSummaryDialog);
   elements.exportDataButton.addEventListener("click", exportData);
   elements.importDataButton.addEventListener("click", () => elements.importDataInput.click());
   elements.importDataInput.addEventListener("change", importDataFromFile);
@@ -186,7 +186,7 @@ function bindEvents() {
   elements.reportForm.addEventListener("submit", downloadReportFromDialog);
   elements.emailReportButton.addEventListener("click", emailReportFromDialog);
   elements.copyReportButton.addEventListener("click", copyReportFromDialog);
-  elements.copyStandupSummaryButton.addEventListener("click", copyStandupSummaryFromDialog);
+  elements.copyStandupSummaryButton?.addEventListener("click", copyStandupSummaryFromDialog);
   elements.flaggedNotesButton.addEventListener("click", openFlaggedNotesDialog);
   elements.urgentIndicator.addEventListener("click", openUrgentTasksDialog);
   elements.scrollTopButton.addEventListener("click", scrollToTop);
@@ -2518,6 +2518,10 @@ function makeRoomAtLeft(row, taskIdToSkip = "") {
 }
 
 function openStandupSummaryDialog() {
+  if (!elements.standupSummaryDialog || !elements.standupSummaryPreview) {
+    return;
+  }
+
   renderStandupSummaryPreview();
   setStandupSummaryCopyStatus("");
   openDialog(elements.standupSummaryDialog);
@@ -2651,6 +2655,10 @@ function appendStandupTextSection(lines, title, items, formatter) {
 }
 
 async function copyStandupSummaryFromDialog() {
+  if (!elements.copyStandupSummaryButton) {
+    return;
+  }
+
   const summaryText = buildStandupSummaryText();
   const originalText = elements.copyStandupSummaryButton.textContent;
   elements.copyStandupSummaryButton.textContent = "Copying";
@@ -2678,6 +2686,10 @@ async function copyStandupSummaryFromDialog() {
 }
 
 function setStandupSummaryCopyStatus(message) {
+  if (!elements.standupSummaryCopyStatus) {
+    return;
+  }
+
   elements.standupSummaryCopyStatus.textContent = message;
   elements.standupSummaryCopyStatus.hidden = !message;
 }
@@ -2892,7 +2904,7 @@ function copyTextWithFallback(text) {
   textarea.style.pointerEvents = "none";
   const copyHost = elements.reportDialog.open
     ? elements.reportDialog
-    : elements.standupSummaryDialog.open
+    : elements.standupSummaryDialog?.open
       ? elements.standupSummaryDialog
       : document.body;
   copyHost.appendChild(textarea);
@@ -3732,6 +3744,10 @@ function startOfToday() {
 }
 
 function openDialog(dialog) {
+  if (!dialog) {
+    return;
+  }
+
   if (dialog.open) {
     return;
   }
@@ -3744,6 +3760,10 @@ function openDialog(dialog) {
 }
 
 function closeDialog(dialog) {
+  if (!dialog) {
+    return;
+  }
+
   if (typeof dialog.close === "function") {
     if (dialog.open) {
       dialog.close();
