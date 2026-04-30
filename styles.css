@@ -189,15 +189,30 @@ button {
 
 .instructions-content {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   border-top: 1px solid var(--line);
   padding: 14px;
   color: var(--muted);
 }
 
+.instructions-content p,
+.instructions-content h3 {
+  margin: 0;
+}
+
+.instructions-content h3 {
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
 .instructions-content ol {
   margin: 0;
   padding-left: 22px;
+}
+
+.instructions-content section {
+  display: grid;
+  gap: 8px;
 }
 
 .instructions-content li + li {
