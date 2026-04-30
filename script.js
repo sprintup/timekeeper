@@ -1286,7 +1286,18 @@ function renderUrgentTasksModal() {
     text.textContent = task.objective;
 
     openButton.append(context, text);
-    item.appendChild(openButton);
+
+    const actions = document.createElement("div");
+    actions.className = "log-actions";
+
+    const startButton = document.createElement("button");
+    startButton.className = "button button-small button-start";
+    startButton.dataset.action = "toggle-timer";
+    startButton.type = "button";
+    startButton.textContent = isTaskRunning(task) ? "Pause" : "Start";
+
+    actions.appendChild(startButton);
+    item.append(openButton, actions);
     elements.urgentTasksList.appendChild(item);
   });
 }
