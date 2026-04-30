@@ -18,6 +18,7 @@ let activeDrag = null;
 let activeTimeLogTaskId = null;
 let activeFinishNoteTaskId = null;
 let activeGoalNotesRowId = null;
+let pendingFinishCancelSnapshot = null;
 let previousGoalRemainingMs = null;
 let chimeAudioContext = null;
 
@@ -139,6 +140,7 @@ function cacheElements() {
   elements.finishNoteIdInput = document.getElementById("finishNoteIdInput");
   elements.finishNoteInput = document.getElementById("finishNoteInput");
   elements.finishNoteSubmitButton = document.getElementById("finishNoteSubmitButton");
+  elements.cancelFinishNoteButton = document.getElementById("cancelFinishNoteButton");
 
   elements.flaggedNotesDialog = document.getElementById("flaggedNotesDialog");
   elements.flaggedNotesList = document.getElementById("flaggedNotesList");
@@ -227,8 +229,14 @@ function handleDocumentClick(event) {
   }
 
   if (action === "close-finish-note-dialog") {
+    pendingFinishCancelSnapshot = null;
     activeFinishNoteTaskId = null;
     closeDialog(elements.finishNoteDialog);
+    return;
+  }
+
+  if (action === "cancel-finish-note-dialog") {
+    cancelPendingFinishFromNotes();
     return;
   }
 
@@ -990,16 +998,21 @@ function createLogAdjustButton(logId, edge, delta, label) {
   return button;
 }
 
-function openFinishNoteDialog(taskId, noteId = "") {
+function openFinishNoteDialog(taskId, noteId = "", options = {}) {
   const task = findTask(taskId);
   if (!task) {
     return;
+  }
+
+  if (!options.allowCancelFinish) {
+    pendingFinishCancelSnapshot = null;
   }
 
   activeFinishNoteTaskId = taskId;
   renderFinishNoteModal();
   elements.finishNoteTaskIdInput.value = taskId;
   elements.finishNoteIdInput.value = noteId;
+  updateCancelFinishNoteButton(taskId, noteId);
 
   const note = noteId ? task.finishNotes.find((candidate) => candidate.id === noteId) : null;
   elements.finishNoteInput.value = note?.text || "";
@@ -1013,6 +1026,7 @@ function renderFinishNoteModal() {
   const task = findTask(activeFinishNoteTaskId);
   if (!task) {
     activeFinishNoteTaskId = null;
+    pendingFinishCancelSnapshot = null;
     closeDialog(elements.finishNoteDialog);
     return;
   }
@@ -1075,6 +1089,13 @@ function resetFinishNoteForm() {
   elements.finishNoteIdInput.value = "";
   elements.finishNoteInput.value = "";
   elements.finishNoteSubmitButton.textContent = "Add note";
+  updateCancelFinishNoteButton(activeFinishNoteTaskId, "");
+}
+
+function updateCancelFinishNoteButton(taskId, noteId = "") {
+  elements.cancelFinishNoteButton.hidden = !pendingFinishCancelSnapshot
+    || pendingFinishCancelSnapshot.taskId !== taskId
+    || Boolean(noteId);
 }
 
 function toggleFinishNoteFlag(taskId, noteId) {
@@ -1761,6 +1782,7 @@ function showTimeLogFromNotes() {
     return;
   }
 
+  pendingFinishCancelSnapshot = null;
   activeFinishNoteTaskId = null;
   closeDialog(elements.finishNoteDialog);
   openTimeLogDialog(taskId);
@@ -1857,6 +1879,7 @@ function saveFinishNoteFromDialog(event) {
     });
   }
 
+  pendingFinishCancelSnapshot = null;
   saveState();
   resetFinishNoteForm();
   renderFinishNoteModal();
@@ -2129,16 +2152,64 @@ function finishTask(taskId) {
   }
 
   const now = new Date();
+  let cancelSnapshot = null;
   if (task.status !== "finished") {
+    const runningLog = getRunningLog(task);
+    cancelSnapshot = {
+      taskId: task.id,
+      status: task.status,
+      finishedAt: task.finishedAt,
+      urgent: task.urgent,
+      wasUrgent: task.wasUrgent,
+      runningLog: runningLog ? {
+        id: runningLog.id,
+        end: runningLog.end || null,
+        durationMs: runningLog.durationMs || 0,
+      } : null,
+    };
     pauseTask(task, now);
     task.status = "finished";
     task.finishedAt = now.toISOString();
     task.urgent = false;
   }
+  pendingFinishCancelSnapshot = cancelSnapshot;
   normalizeBoard();
   saveState();
   render();
-  openFinishNoteDialog(taskId);
+  openFinishNoteDialog(taskId, "", { allowCancelFinish: Boolean(cancelSnapshot) });
+}
+
+function cancelPendingFinishFromNotes() {
+  if (!pendingFinishCancelSnapshot) {
+    activeFinishNoteTaskId = null;
+    closeDialog(elements.finishNoteDialog);
+    return;
+  }
+
+  const snapshot = pendingFinishCancelSnapshot;
+  const task = findTask(snapshot.taskId);
+  pendingFinishCancelSnapshot = null;
+
+  if (task) {
+    task.status = snapshot.status || "active";
+    task.finishedAt = snapshot.finishedAt || null;
+    task.urgent = snapshot.urgent === true;
+    task.wasUrgent = snapshot.wasUrgent === true;
+
+    if (snapshot.runningLog) {
+      const log = task.logs.find((candidate) => candidate.id === snapshot.runningLog.id);
+      if (log) {
+        log.end = snapshot.runningLog.end;
+        log.durationMs = snapshot.runningLog.durationMs;
+      }
+    }
+  }
+
+  activeFinishNoteTaskId = null;
+  closeDialog(elements.finishNoteDialog);
+  normalizeBoard();
+  saveState();
+  render();
 }
 
 function restartTask(taskId) {
