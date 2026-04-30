@@ -10,7 +10,6 @@ const state = {
   timeGoalMs: DEFAULT_TIME_GOAL_MS,
   timeGoalCleared: false,
   goalChimeKey: "",
-  hideFinished: false,
 };
 
 const elements = {};
@@ -92,13 +91,13 @@ function cacheElements() {
   elements.goalCountPill = document.getElementById("goalCountPill");
   elements.unfinishedTaskCountPill = document.getElementById("unfinishedTaskCountPill");
   elements.generateReportButton = document.getElementById("generateReportButton");
-  elements.clearCompletedButton = document.getElementById("clearCompletedButton");
   elements.exportDataButton = document.getElementById("exportDataButton");
   elements.importDataButton = document.getElementById("importDataButton");
   elements.importDataInput = document.getElementById("importDataInput");
   elements.resetStateButton = document.getElementById("resetStateButton");
   elements.scrollTopButton = document.getElementById("scrollTopButton");
   elements.flaggedNotesButton = document.getElementById("flaggedNotesButton");
+  elements.standupSummaryButton = document.getElementById("standupSummaryButton");
 
   elements.taskDialog = document.getElementById("taskDialog");
   elements.taskForm = document.getElementById("taskForm");
@@ -159,11 +158,15 @@ function cacheElements() {
   elements.copyReportButton = document.getElementById("copyReportButton");
   elements.copyReportStatus = document.getElementById("copyReportStatus");
   elements.deleteAfterReportInput = document.getElementById("deleteAfterReportInput");
+  elements.standupSummaryDialog = document.getElementById("standupSummaryDialog");
+  elements.standupSummaryPreview = document.getElementById("standupSummaryPreview");
+  elements.copyStandupSummaryButton = document.getElementById("copyStandupSummaryButton");
+  elements.standupSummaryCopyStatus = document.getElementById("standupSummaryCopyStatus");
 }
 
 function bindEvents() {
   elements.generateReportButton.addEventListener("click", openReportDialog);
-  elements.clearCompletedButton.addEventListener("click", toggleHideFinished);
+  elements.standupSummaryButton.addEventListener("click", openStandupSummaryDialog);
   elements.exportDataButton.addEventListener("click", exportData);
   elements.importDataButton.addEventListener("click", () => elements.importDataInput.click());
   elements.importDataInput.addEventListener("change", importDataFromFile);
@@ -183,6 +186,7 @@ function bindEvents() {
   elements.reportForm.addEventListener("submit", downloadReportFromDialog);
   elements.emailReportButton.addEventListener("click", emailReportFromDialog);
   elements.copyReportButton.addEventListener("click", copyReportFromDialog);
+  elements.copyStandupSummaryButton.addEventListener("click", copyStandupSummaryFromDialog);
   elements.flaggedNotesButton.addEventListener("click", openFlaggedNotesDialog);
   elements.urgentIndicator.addEventListener("click", openUrgentTasksDialog);
   elements.scrollTopButton.addEventListener("click", scrollToTop);
@@ -259,6 +263,11 @@ function handleDocumentClick(event) {
 
   if (action === "close-report-dialog") {
     closeDialog(elements.reportDialog);
+    return;
+  }
+
+  if (action === "close-standup-summary-dialog") {
+    closeDialog(elements.standupSummaryDialog);
     return;
   }
 
@@ -448,7 +457,6 @@ function loadState() {
     state.timeGoalMs = DEFAULT_TIME_GOAL_MS;
     state.timeGoalCleared = false;
     state.goalChimeKey = "";
-    state.hideFinished = false;
     setTimeGoalInputs(state.timeGoalMs);
     return;
   }
@@ -460,7 +468,6 @@ function loadState() {
     state.timeGoalCleared = parsed.timeGoalCleared === true;
     state.timeGoalMs = state.timeGoalCleared ? sanitizeTimeGoal(parsed.timeGoalMs) : sanitizeTimeGoal(parsed.timeGoalMs, DEFAULT_TIME_GOAL_MS);
     state.goalChimeKey = typeof parsed.goalChimeKey === "string" ? parsed.goalChimeKey : "";
-    state.hideFinished = parsed.hideFinished === true;
     setTimeGoalInputs(state.timeGoalMs);
     normalizeBoard();
     enforceSingleRunningLog();
@@ -472,7 +479,6 @@ function loadState() {
     state.timeGoalMs = DEFAULT_TIME_GOAL_MS;
     state.timeGoalCleared = false;
     state.goalChimeKey = "";
-    state.hideFinished = false;
     setTimeGoalInputs(state.timeGoalMs);
   }
 }
@@ -488,7 +494,6 @@ function getStateSnapshot() {
     timeGoalMs: state.timeGoalMs,
     timeGoalCleared: state.timeGoalCleared,
     goalChimeKey: state.goalChimeKey,
-    hideFinished: state.hideFinished,
   };
 }
 
@@ -583,7 +588,6 @@ function applyImportedState(importedState) {
     ? sanitizeTimeGoal(importedState.timeGoalMs)
     : sanitizeTimeGoal(importedState.timeGoalMs, DEFAULT_TIME_GOAL_MS);
   state.goalChimeKey = typeof importedState.goalChimeKey === "string" ? importedState.goalChimeKey : "";
-  state.hideFinished = importedState.hideFinished === true;
   previousGoalRemainingMs = null;
   activeTimeLogTaskId = null;
   activeFinishNoteTaskId = null;
@@ -602,6 +606,7 @@ function applyImportedState(importedState) {
   closeDialog(elements.urgentTasksDialog);
   closeDialog(elements.goalNotesDialog);
   closeDialog(elements.reportDialog);
+  closeDialog(elements.standupSummaryDialog);
   render();
 }
 
@@ -724,7 +729,6 @@ function sanitizeTimeGoal(value, fallback = 0) {
 
 function render() {
   normalizeBoard();
-  elements.clearCompletedButton.textContent = state.hideFinished ? "Display Finished" : "Hide Finished";
   elements.board.innerHTML = "";
 
   const rows = getRows();
@@ -771,7 +775,7 @@ function render() {
     track.dataset.rowIndex = String(rowIndex);
 
     const activeTasks = tasks.filter((task) => task.status !== "finished");
-    const completedTasks = state.hideFinished ? [] : tasks.filter((task) => task.status === "finished");
+    const completedTasks = tasks.filter((task) => task.status === "finished");
 
     activeTasks.forEach((task) => {
       track.appendChild(createTaskCard(task));
@@ -2411,12 +2415,6 @@ function clearCompletedTasksWithPrompt() {
   clearCompletedTasks();
 }
 
-function toggleHideFinished() {
-  state.hideFinished = !state.hideFinished;
-  saveState();
-  render();
-}
-
 function clearCompletedTasks() {
   state.tasks = state.tasks.filter((task) => task.status !== "finished");
   normalizeBoard();
@@ -2484,7 +2482,6 @@ function resetStateWithPrompt() {
   state.timeGoalMs = DEFAULT_TIME_GOAL_MS;
   state.timeGoalCleared = false;
   state.goalChimeKey = "";
-  state.hideFinished = false;
   previousGoalRemainingMs = null;
   setTimeGoalInputs(state.timeGoalMs);
   activeTimeLogTaskId = null;
@@ -2498,6 +2495,7 @@ function resetStateWithPrompt() {
   closeDialog(elements.urgentTasksDialog);
   closeDialog(elements.goalNotesDialog);
   closeDialog(elements.reportDialog);
+  closeDialog(elements.standupSummaryDialog);
   render();
 }
 
@@ -2517,6 +2515,171 @@ function makeRoomAtLeft(row, taskIdToSkip = "") {
       candidate.order += 1;
     }
   });
+}
+
+function openStandupSummaryDialog() {
+  renderStandupSummaryPreview();
+  setStandupSummaryCopyStatus("");
+  openDialog(elements.standupSummaryDialog);
+}
+
+function renderStandupSummaryPreview() {
+  const summary = buildStandupSummary();
+  elements.standupSummaryPreview.innerHTML = "";
+
+  const heading = document.createElement("h3");
+  heading.textContent = "Standup Summary";
+
+  elements.standupSummaryPreview.appendChild(heading);
+  appendStandupPreviewSection(
+    elements.standupSummaryPreview,
+    "What I did yesterday",
+    summary.completedYesterday,
+    formatStandupCompletedTask
+  );
+  appendStandupPreviewSection(
+    elements.standupSummaryPreview,
+    "What I'm doing today",
+    summary.todayTasks,
+    formatStandupTodayTask
+  );
+  appendStandupPreviewSection(
+    elements.standupSummaryPreview,
+    "What I'm stuck on",
+    summary.blockers,
+    formatStandupBlocker
+  );
+}
+
+function appendStandupPreviewSection(parent, title, items, formatter) {
+  const heading = document.createElement("h4");
+  heading.textContent = title;
+
+  const list = document.createElement("ul");
+  if (items.length === 0) {
+    const emptyItem = document.createElement("li");
+    emptyItem.textContent = "None";
+    list.appendChild(emptyItem);
+  } else {
+    items.forEach((item) => {
+      const listItem = document.createElement("li");
+      listItem.textContent = formatter(item);
+      list.appendChild(listItem);
+    });
+  }
+
+  parent.append(heading, list);
+}
+
+function buildStandupSummary() {
+  const unfinishedTasks = getSortedTasks().filter((task) => !isTaskFinishedForReport(task));
+  const urgentTasks = unfinishedTasks
+    .filter((task) => task.urgent)
+    .map(createStandupTaskEntry);
+  const prioritizedTasks = unfinishedTasks
+    .filter((task) => !task.urgent)
+    .map(createStandupTaskEntry);
+
+  return {
+    completedYesterday: getCompletedTasksForYesterday().map(createStandupTaskEntry),
+    todayTasks: [...urgentTasks, ...prioritizedTasks],
+    blockers: getFlaggedNotes().map(({ task, note }) => ({
+      activity: getRowName(task.row),
+      objective: task.objective,
+      note: note.text,
+    })),
+  };
+}
+
+function getCompletedTasksForYesterday() {
+  const todayStart = startOfToday();
+  const yesterdayStart = new Date(todayStart);
+  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+
+  return getSortedTasks()
+    .filter((task) => task.finishedAt
+      && isTaskFinishedForReport(task)
+      && isDateInRange(task.finishedAt, yesterdayStart, todayStart))
+    .sort((a, b) => new Date(a.finishedAt).getTime() - new Date(b.finishedAt).getTime());
+}
+
+function isDateInRange(value, start, end) {
+  const date = new Date(value);
+  return !Number.isNaN(date.getTime()) && date >= start && date < end;
+}
+
+function createStandupTaskEntry(task) {
+  return {
+    objective: task.objective,
+    activity: getRowName(task.row),
+    bucket: task.bucket,
+    durationMs: getTaskElapsed(task),
+    urgent: task.urgent,
+  };
+}
+
+function formatStandupCompletedTask(entry) {
+  return `${entry.objective} (${entry.activity} / ${entry.bucket}) - ${formatDuration(entry.durationMs)}`;
+}
+
+function formatStandupTodayTask(entry) {
+  return `${entry.urgent ? "[Urgent] " : ""}${entry.objective} (${entry.activity} / ${entry.bucket})`;
+}
+
+function formatStandupBlocker(entry) {
+  return `${entry.activity} / ${entry.objective}: ${entry.note}`;
+}
+
+function buildStandupSummaryText(summary = buildStandupSummary()) {
+  const lines = ["# Standup Summary"];
+  appendStandupTextSection(lines, "What I did yesterday", summary.completedYesterday, formatStandupCompletedTask);
+  appendStandupTextSection(lines, "What I'm doing today", summary.todayTasks, formatStandupTodayTask);
+  appendStandupTextSection(lines, "What I'm stuck on", summary.blockers, formatStandupBlocker);
+  return `${lines.join("\n")}\n`;
+}
+
+function appendStandupTextSection(lines, title, items, formatter) {
+  lines.push("", `## ${title}`);
+  if (items.length === 0) {
+    lines.push("- None");
+    return;
+  }
+
+  items.forEach((item) => {
+    lines.push(`- ${formatter(item)}`);
+  });
+}
+
+async function copyStandupSummaryFromDialog() {
+  const summaryText = buildStandupSummaryText();
+  const originalText = elements.copyStandupSummaryButton.textContent;
+  elements.copyStandupSummaryButton.textContent = "Copying";
+  elements.copyStandupSummaryButton.disabled = true;
+  setStandupSummaryCopyStatus("");
+
+  try {
+    await copyTextToClipboard(summaryText);
+    elements.copyStandupSummaryButton.textContent = "Copied";
+    setStandupSummaryCopyStatus("Copied to clipboard.");
+  } catch (error) {
+    elements.copyStandupSummaryButton.textContent = "Copy failed";
+    setStandupSummaryCopyStatus("Copy failed.");
+  }
+
+  window.setTimeout(() => {
+    if (!elements.copyStandupSummaryButton.isConnected) {
+      return;
+    }
+
+    elements.copyStandupSummaryButton.textContent = originalText;
+    elements.copyStandupSummaryButton.disabled = false;
+    setStandupSummaryCopyStatus("");
+  }, 1800);
+}
+
+function setStandupSummaryCopyStatus(message) {
+  elements.standupSummaryCopyStatus.textContent = message;
+  elements.standupSummaryCopyStatus.hidden = !message;
 }
 
 function openReportDialog() {
@@ -2727,7 +2890,11 @@ function copyTextWithFallback(text) {
   textarea.style.border = "0";
   textarea.style.opacity = "0";
   textarea.style.pointerEvents = "none";
-  const copyHost = elements.reportDialog.open ? elements.reportDialog : document.body;
+  const copyHost = elements.reportDialog.open
+    ? elements.reportDialog
+    : elements.standupSummaryDialog.open
+      ? elements.standupSummaryDialog
+      : document.body;
   copyHost.appendChild(textarea);
   textarea.focus();
   textarea.select();

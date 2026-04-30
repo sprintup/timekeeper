@@ -34,8 +34,8 @@
           </div>
         </details>
         <div class="header-actions actions-panel" aria-label="Report actions">
-          <button class="button button-primary" id="generateReportButton" type="button">Generate report</button>
-          <button class="button button-secondary" id="clearCompletedButton" type="button">Hide Finished</button>
+          <button class="button button-primary" id="standupSummaryButton" type="button">Standup Summary</button>
+          <button class="button button-secondary" id="generateReportButton" type="button">Manager's Report</button>
           <button class="button button-secondary" id="exportDataButton" type="button">Export</button>
           <button class="button button-secondary" id="importDataButton" type="button">Import</button>
           <input id="importDataInput" type="file" accept="application/json,.json" hidden>
@@ -370,6 +370,19 @@
           <button class="button button-primary" type="submit" formnovalidate>Download</button>
         </div>
       </form>
+    </dialog>
+    <dialog class="modal modal-wide" id="standupSummaryDialog">
+      <div class="modal-body">
+        <div class="modal-header">
+          <h2>Standup Summary</h2>
+        </div>
+        <div class="report-preview" id="standupSummaryPreview"></div>
+        <div class="modal-actions">
+          <button class="button button-secondary" id="copyStandupSummaryButton" type="button">Copy</button>
+          <span class="copy-report-status" id="standupSummaryCopyStatus" role="status" aria-live="polite" hidden></span>
+          <button class="button button-primary" type="button" data-action="close-standup-summary-dialog">Close</button>
+        </div>
+      </div>
     </dialog>
     <script src="script.js"></script>
   </body>
