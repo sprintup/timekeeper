@@ -3633,16 +3633,32 @@ function toggleStandupSummaryItemHighlight(item) {
   }
 
   const shouldHighlight = !standupHighlightedKeys.has(key);
+  let noteStateChanged = false;
+  let shouldRefreshPreview = false;
   if (shouldHighlight) {
     standupHighlightedKeys.add(key);
   } else {
+    const softDeleteResult = softDeleteStandupNoteHighlightWithPrompt(key);
+    if (softDeleteResult.cancelled) {
+      return;
+    }
+
+    if (softDeleteResult.handled) {
+      noteStateChanged = true;
+      shouldRefreshPreview = true;
+    }
+
     standupHighlightedKeys.delete(key);
   }
 
-  const reportSyncChanged = syncReportedNoteFromStandupHighlightKey(key, shouldHighlight);
+  const reportSyncChanged = shouldHighlight && syncReportedNoteFromStandupHighlightKey(key, true);
   saveStandupSettings();
-  if (reportSyncChanged) {
+  if (noteStateChanged || reportSyncChanged) {
     saveState();
+    refreshStandupNoteStateViews();
+  }
+
+  if (shouldRefreshPreview || reportSyncChanged) {
     renderStandupSummaryPreview();
   } else {
     syncStandupSummaryHighlightItems();
@@ -3666,6 +3682,70 @@ function getStandupBlockerHighlightKey(task, noteId) {
 
 function getStandupReportedNoteHighlightKey(task, noteId) {
   return `since:${task.id}:${noteId}`;
+}
+
+function softDeleteStandupNoteHighlightWithPrompt(key) {
+  const target = getStandupNoteHighlightTarget(key);
+  if (!target) {
+    return { handled: false, cancelled: false };
+  }
+
+  const actionLabel = target.type === "reported" ? "Report in standup" : "Flag for elevation";
+  const activityName = getRowName(target.task.row);
+  const taskObjective = target.task.objective;
+  console.info(
+    `Standup note removal: go back to "${activityName}" / "${taskObjective}" notes and choose "${actionLabel}" to add it here again.`
+  );
+  const confirmed = window.confirm(
+    `Remove this note from the standup summary?\n\nThis will not delete the note. To add it here again, go back to "${activityName}" / "${taskObjective}" notes and choose "${actionLabel}".`
+  );
+  if (!confirmed) {
+    return { handled: true, cancelled: true };
+  }
+
+  if (target.type === "reported") {
+    target.note.reported = false;
+  } else {
+    target.note.flagged = false;
+  }
+
+  return { handled: true, cancelled: false };
+}
+
+function getStandupNoteHighlightTarget(key) {
+  const match = typeof key === "string" ? key.match(/^(since|blocker):([^:]+):([^:]+)$/) : null;
+  if (!match) {
+    return null;
+  }
+
+  const [, section, taskId, noteId] = match;
+  const task = findTask(taskId);
+  const note = task?.finishNotes.find((candidate) => candidate.id === noteId);
+  if (!task || !note) {
+    return null;
+  }
+
+  return {
+    note,
+    task,
+    type: section === "since" ? "reported" : "flagged",
+  };
+}
+
+function refreshStandupNoteStateViews() {
+  if (activeFinishNoteTaskId) {
+    renderFinishNoteModal();
+  }
+
+  if (elements.flaggedNotesDialog.open) {
+    renderFlaggedNotesModal();
+  }
+
+  if (elements.goalNotesDialog.open) {
+    renderGoalNotesModal();
+  }
+
+  updateFlaggedNotesButton();
 }
 
 function syncReportedNoteFromStandupHighlightKey(key, isHighlighted) {
