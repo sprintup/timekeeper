@@ -1191,6 +1191,10 @@ body.is-board-dragging * {
   font-weight: 800;
 }
 
+.required-marker {
+  color: var(--red);
+}
+
 .field input,
 .field select,
 .field textarea {

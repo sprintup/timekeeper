@@ -26,6 +26,7 @@ let activeTimeLogTaskId = null;
 let activeFinishNoteTaskId = null;
 let activeGoalNotesRowId = null;
 let pendingFinishCancelSnapshot = null;
+let pendingNoteConversion = null;
 let previousGoalRemainingMs = null;
 let chimeAudioContext = null;
 let backupDirectoryHandle = null;
@@ -205,6 +206,7 @@ function bindEvents() {
   elements.timeGoalForm.addEventListener("submit", saveTimeGoalFromForm);
   elements.clearTimeGoalButton.addEventListener("click", clearTimeGoal);
   elements.taskForm.addEventListener("submit", saveTaskFromDialog);
+  elements.taskDialog.addEventListener("close", clearPendingNoteConversion);
   elements.rowForm.addEventListener("submit", saveRowFromDialog);
   elements.logForm.addEventListener("submit", saveManualLogFromDialog);
   elements.logStartInput.addEventListener("input", syncLogFieldsFromStart);
@@ -2385,7 +2387,7 @@ function createRow(name) {
   };
 }
 
-function openTaskDialog(mode, placement, task = null, rowIndex = "") {
+function openTaskDialog(mode, placement, task = null, rowIndex = "", options = {}) {
   ensureRowsForTasks();
   elements.taskDialogTitle.textContent = mode === "edit" ? "Edit task" : "Add task";
   elements.taskIdInput.value = task?.id || "";
@@ -2394,13 +2396,17 @@ function openTaskDialog(mode, placement, task = null, rowIndex = "") {
   elements.objectiveInput.value = task?.objective || "";
   elements.bucketInput.value = task?.bucket || "";
   populateTaskRowSelect(task?.row ?? rowIndex);
-  elements.taskSendToField.hidden = mode !== "edit" || !task;
+  elements.taskSendToField.hidden = false;
   elements.deleteTaskDialogButton.hidden = mode !== "edit" || !task;
   elements.saveUrgentTaskDialogButton.hidden = mode === "edit";
   elements.taskCategoryGuide.hidden = placement !== "side";
   elements.taskCategoryGuide.open = placement === "side";
   openDialog(elements.taskDialog);
-  elements.objectiveInput.focus();
+  if (options.focus === "bucket") {
+    elements.bucketInput.focus();
+  } else {
+    elements.objectiveInput.focus();
+  }
 }
 
 function populateTaskRowSelect(selectedRowIndex = "") {
@@ -2416,6 +2422,8 @@ function populateTaskRowSelect(selectedRowIndex = "") {
 
   if (selectedValue !== "" && state.rows[Number(selectedValue)]) {
     elements.taskRowSelect.value = selectedValue;
+  } else if (state.rows.length > 0) {
+    elements.taskRowSelect.value = "0";
   }
 }
 
@@ -2450,8 +2458,12 @@ function saveTaskFromDialog(event) {
       savedTask = task;
     }
   } else {
-    savedTask = createTask({ objective, bucket, placement, rowIndex });
+    const targetRowIndex = Number.isInteger(selectedRowIndex) && state.rows[selectedRowIndex]
+      ? selectedRowIndex
+      : rowIndex;
+    savedTask = createTask({ objective, bucket, placement, rowIndex: targetRowIndex });
     state.tasks.push(savedTask);
+    completePendingNoteConversion();
   }
 
   if (shouldSaveUrgent && savedTask && savedTask.status !== "finished") {
@@ -3202,29 +3214,56 @@ function convertFinishNoteToTask(taskId, noteId) {
   }
 
   const objective = createTaskObjectiveFromNote(note.text);
-  const convertedTask = createTask({
+  pendingNoteConversion = { taskId, noteId };
+  activeFinishNoteTaskId = null;
+  pendingFinishCancelSnapshot = null;
+  closeDialog(elements.finishNoteDialog);
+  openTaskDialog("add", "side", {
     objective,
-    bucket: sourceTask.bucket,
-    placement: "side",
-    rowIndex: sourceTask.row,
-  });
-  state.tasks.push(convertedTask);
+    bucket: "",
+    row: sourceTask.row,
+  }, sourceTask.row, { focus: "bucket" });
+}
+
+function completePendingNoteConversion() {
+  if (!pendingNoteConversion) {
+    return;
+  }
+
+  const { taskId, noteId } = pendingNoteConversion;
+  pendingNoteConversion = null;
+
+  const sourceTask = findTask(taskId);
+  const note = sourceTask?.finishNotes.find((candidate) => candidate.id === noteId);
+  if (!sourceTask || !note) {
+    return;
+  }
+
   removeStandupHighlightKeysForNote(sourceTask, noteId);
   sourceTask.finishNotes = sourceTask.finishNotes.filter((candidate) => candidate.id !== noteId);
-  normalizeBoard();
-  saveState();
+
   if (activeFinishNoteTaskId === taskId) {
     resetFinishNoteForm();
     renderFinishNoteModal();
   }
+
   if (elements.flaggedNotesDialog.open) {
     renderFlaggedNotesModal();
   }
+
   if (elements.goalNotesDialog.open) {
     renderGoalNotesModal();
   }
+
+  if (elements.standupSummaryDialog.open) {
+    renderStandupSummaryPreview();
+  }
+
   updateFlaggedNotesButton();
-  render();
+}
+
+function clearPendingNoteConversion() {
+  pendingNoteConversion = null;
 }
 
 function createTaskObjectiveFromNote(noteText) {

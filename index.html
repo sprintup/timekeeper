@@ -183,7 +183,7 @@
           <textarea id="objectiveInput" rows="3" maxlength="180" required></textarea>
         </label>
         <label class="field">
-          <span>Bucket</span>
+          <span>Bucket <span class="required-marker" aria-hidden="true">*</span></span>
           <select id="bucketInput" required>
             <option value="" disabled selected>Select bucket</option>
             <option>Admin</option>
@@ -191,10 +191,6 @@
             <option>Projects</option>
             <option>Personal</option>
           </select>
-        </label>
-        <label class="field" id="taskSendToField" hidden>
-          <span>Send to activity</span>
-          <select id="taskRowSelect"></select>
         </label>
         <details class="category-helper" id="taskCategoryGuide">
           <summary>Time categories</summary>
@@ -217,6 +213,10 @@
             </section>
           </div>
         </details>
+        <label class="field" id="taskSendToField" hidden>
+          <span>Send to activity</span>
+          <select id="taskRowSelect"></select>
+        </label>
         <div class="modal-actions">
           <button class="button button-secondary" type="button" data-action="close-task-dialog">Cancel</button>
           <button class="button button-danger" id="deleteTaskDialogButton" type="button" data-action="delete-task-from-dialog" hidden>Delete</button>
