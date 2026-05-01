@@ -1075,7 +1075,7 @@ body.is-board-dragging * {
 }
 
 .modal-wide {
-  width: min(720px, calc(100% - 32px));
+  width: min(920px, calc(100% - 32px));
 }
 
 .modal::backdrop {
@@ -1111,10 +1111,9 @@ body.is-board-dragging * {
 }
 
 .modal-task-title {
-  max-width: min(760px, 70vw);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .modal-header-actions {
