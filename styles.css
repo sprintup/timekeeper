@@ -1128,9 +1128,34 @@ body.is-board-dragging * {
   font-weight: 800;
 }
 
-.standup-instructions .modal-help {
+.standup-instructions-content {
+  display: grid;
+  gap: 10px;
   border-top: 1px solid var(--line);
   padding: 10px 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.standup-instructions-content p,
+.standup-instructions-content dl,
+.standup-instructions-content dd {
+  margin: 0;
+}
+
+.standup-instructions-content dl {
+  display: grid;
+  gap: 8px;
+}
+
+.standup-instructions-content dt {
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.standup-instructions-content dd {
+  margin-top: 2px;
 }
 
 .field {

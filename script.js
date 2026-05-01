@@ -3373,30 +3373,7 @@ function toggleStandupSummaryItemHighlight(item) {
     standupHighlightedKeys.delete(key);
   }
   saveStandupSettings();
-  syncTaskStandupHighlightFromKey(key);
-}
-
-function syncTaskStandupHighlightFromKey(key) {
-  const taskId = getTaskIdFromStandupHighlightKey(key);
-  const task = findTask(taskId);
-  if (!task) {
-    return;
-  }
-
-  document.querySelectorAll(".task-card").forEach((card) => {
-    if (card.dataset.taskId === taskId) {
-      card.classList.toggle("is-standup-highlighted", isTaskHighlightedInStandup(task));
-    }
-  });
-}
-
-function getTaskIdFromStandupHighlightKey(key) {
-  if (typeof key !== "string") {
-    return "";
-  }
-
-  const [section, taskId] = key.split(":");
-  return section === "since" || section === "today" || section === "blocker" ? taskId || "" : "";
+  render();
 }
 
 function isTaskHighlightedInStandup(task) {
@@ -3427,23 +3404,13 @@ function buildStandupSummary() {
   return {
     sinceLastStandupTasks: getStandupTasksSince(rangeStart, rangeEnd),
     todayTasks: [...urgentTasks, ...prioritizedTasks],
-    blockers: getStandupNotes().map(({ task, note }) => ({
+    blockers: getFlaggedNotes().map(({ task, note }) => ({
       id: `${task.id}:${note.id}`,
       activity: getRowName(task.row),
       objective: task.objective,
       note: note.text,
     })),
   };
-}
-
-function getStandupNotes() {
-  return getSortedTasks()
-    .flatMap((task) => task.finishNotes.map((note) => ({ task, note })))
-    .sort((a, b) => (
-      a.task.row - b.task.row
-      || a.task.order - b.task.order
-      || new Date(a.note.createdAt).getTime() - new Date(b.note.createdAt).getTime()
-    ));
 }
 
 function getStandupTasksSince(rangeStart, rangeEnd) {

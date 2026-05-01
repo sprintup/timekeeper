@@ -452,7 +452,23 @@
           </label>
           <details class="standup-instructions">
             <summary>Instructions</summary>
-            <p class="modal-help">Set the last standup date to show work since then. Click any bullet to highlight it; highlights stay saved across opens. Use focus highlights for things you want to make progress on before the next standup and can talk about in standup.</p>
+            <div class="standup-instructions-content">
+              <p>Set the last standup date to show work logged since that standup. Click any bullet to mark it as a focus item, which stays saved across opens and can represent work you want to make progress on before the next standup or talk about during standup.</p>
+              <dl>
+                <div>
+                  <dt>What I did since last standup</dt>
+                  <dd>Tasks with time logged since the selected date, grouped by activity.</dd>
+                </div>
+                <div>
+                  <dt>What I'm doing today</dt>
+                  <dd>Current unfinished tasks, with urgent tasks listed first and the rest in priority order.</dd>
+                </div>
+                <div>
+                  <dt>What I'm stuck on</dt>
+                  <dd>Flagged notes across all time, regardless of the selected date.</dd>
+                </div>
+              </dl>
+            </div>
           </details>
         </div>
         <div class="report-preview" id="standupSummaryPreview"></div>
