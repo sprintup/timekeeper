@@ -3372,19 +3372,61 @@ function isFocusStandupSection(sectionKey) {
 
 function toggleStandupSummaryItemHighlight(item) {
   const key = item.dataset.standupKey;
-  const isHighlighted = item.classList.toggle("is-highlighted");
-  item.setAttribute("aria-pressed", String(isHighlighted));
   if (!key) {
     return;
   }
 
-  if (isHighlighted) {
+  const shouldHighlight = !standupHighlightedKeys.has(key);
+  if (shouldHighlight) {
     standupHighlightedKeys.add(key);
+  } else if (isFocusStandupHighlightKey(key)) {
+    removeFocusStandupHighlightsForTask(getTaskIdFromStandupHighlightKey(key));
   } else {
     standupHighlightedKeys.delete(key);
   }
+
   saveStandupSettings();
+  syncStandupSummaryHighlightItems();
   render();
+}
+
+function syncStandupSummaryHighlightItems() {
+  elements.standupSummaryPreview
+    ?.querySelectorAll("[data-standup-key]")
+    .forEach((item) => {
+      const isHighlighted = standupHighlightedKeys.has(item.dataset.standupKey);
+      item.classList.toggle("is-highlighted", isHighlighted);
+      item.setAttribute("aria-pressed", String(isHighlighted));
+    });
+}
+
+function removeFocusStandupHighlightsForTask(taskId) {
+  if (!taskId) {
+    return;
+  }
+
+  [...standupHighlightedKeys]
+    .filter((key) => isFocusStandupHighlightKey(key) && getTaskIdFromStandupHighlightKey(key) === taskId)
+    .forEach((key) => {
+      standupHighlightedKeys.delete(key);
+    });
+}
+
+function isFocusStandupHighlightKey(key) {
+  return isFocusStandupSection(getStandupSectionFromKey(key));
+}
+
+function getStandupSectionFromKey(key) {
+  return typeof key === "string" ? key.split(":")[0] || "" : "";
+}
+
+function getTaskIdFromStandupHighlightKey(key) {
+  if (typeof key !== "string") {
+    return "";
+  }
+
+  const [section, taskId] = key.split(":");
+  return section === "since" || section === "today" || section === "blocker" ? taskId || "" : "";
 }
 
 function isTaskHighlightedInStandup(task) {
