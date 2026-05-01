@@ -1519,15 +1519,23 @@ body.is-board-dragging * {
 }
 
 #flaggedNotesDialog .modal-body,
-#urgentTasksDialog .modal-body,
-#unfinishedTasksDialog .modal-body {
+#urgentTasksDialog .modal-body {
   grid-template-rows: auto minmax(0, 1fr) auto;
+  max-height: calc(100vh - 64px);
+}
+
+#unfinishedTasksDialog .modal-body {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   max-height: calc(100vh - 64px);
 }
 
 #goalNotesDialog .modal-body {
   grid-template-rows: auto minmax(0, 1fr) auto;
   max-height: calc(100vh - 64px);
+}
+
+.unfinished-search-field {
+  gap: 5px;
 }
 
 .flagged-notes-list,
@@ -1624,6 +1632,12 @@ body.is-board-dragging * {
   background: var(--green);
 }
 
+.unfinished-task-content {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
 .flagged-note-open,
 .urgent-task-open,
 .unfinished-task-open {
@@ -1697,6 +1711,40 @@ body.is-board-dragging * {
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 2px;
+}
+
+.unfinished-task-notes {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.unfinished-task-notes summary {
+  width: fit-content;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.unfinished-task-note-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.unfinished-task-note-list li {
+  border-left: 3px solid var(--line);
+  padding-left: 7px;
+  overflow-wrap: anywhere;
+}
+
+.unfinished-task-note-list li.is-flagged {
+  border-left-color: var(--red);
+}
+
+.unfinished-task-note-list li.is-report-note {
+  border-left-color: var(--bucket-admin-line);
 }
 
 .unfinished-task-badge {

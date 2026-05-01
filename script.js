@@ -175,6 +175,7 @@ function cacheElements() {
   elements.urgentTasksList = document.getElementById("urgentTasksList");
   elements.unfinishedTasksDialog = document.getElementById("unfinishedTasksDialog");
   elements.unfinishedTasksList = document.getElementById("unfinishedTasksList");
+  elements.unfinishedTasksSearchInput = document.getElementById("unfinishedTasksSearchInput");
   elements.goalNotesDialog = document.getElementById("goalNotesDialog");
   elements.goalNotesDialogTitle = document.getElementById("goalNotesDialogTitle");
   elements.goalNotesList = document.getElementById("goalNotesList");
@@ -223,6 +224,7 @@ function bindEvents() {
   elements.flaggedNotesButton.addEventListener("click", openFlaggedNotesDialog);
   elements.urgentIndicator.addEventListener("click", openUrgentTasksDialog);
   elements.unfinishedTaskCountPill.addEventListener("click", openUnfinishedTasksDialog);
+  elements.unfinishedTasksSearchInput.addEventListener("input", renderUnfinishedTasksModal);
   elements.scrollTopButton.addEventListener("click", scrollToTop);
 
   document.addEventListener("click", handleDocumentClick);
@@ -1774,8 +1776,10 @@ function openUrgentTasksDialog() {
 }
 
 function openUnfinishedTasksDialog() {
+  elements.unfinishedTasksSearchInput.value = "";
   renderUnfinishedTasksModal();
   openDialog(elements.unfinishedTasksDialog);
+  elements.unfinishedTasksSearchInput.focus();
 }
 
 function renderFlaggedNotesModal() {
@@ -1877,13 +1881,25 @@ function renderUrgentTasksModal() {
 }
 
 function renderUnfinishedTasksModal() {
-  const unfinishedTasks = getUnfinishedTasks();
+  const query = getUnfinishedTaskSearchQuery();
+  const allUnfinishedTasks = getUnfinishedTasks();
+  const unfinishedTasks = query
+    ? allUnfinishedTasks.filter((task) => doesUnfinishedTaskMatchSearch(task, query))
+    : allUnfinishedTasks;
   elements.unfinishedTasksList.innerHTML = "";
+
+  if (allUnfinishedTasks.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty-log";
+    empty.textContent = "No unfinished tasks.";
+    elements.unfinishedTasksList.appendChild(empty);
+    return;
+  }
 
   if (unfinishedTasks.length === 0) {
     const empty = document.createElement("p");
     empty.className = "empty-log";
-    empty.textContent = "No unfinished tasks.";
+    empty.textContent = "No unfinished tasks match that search.";
     elements.unfinishedTasksList.appendChild(empty);
     return;
   }
@@ -1913,8 +1929,26 @@ function renderUnfinishedTasksModal() {
       elements.unfinishedTasksList.appendChild(currentGroup);
     }
 
-    currentGroupTasks.appendChild(createUnfinishedTaskItem(task));
+    currentGroupTasks.appendChild(createUnfinishedTaskItem(task, query));
   });
+}
+
+function getUnfinishedTaskSearchQuery() {
+  return normalizeSearchText(elements.unfinishedTasksSearchInput?.value || "");
+}
+
+function doesUnfinishedTaskMatchSearch(task, query) {
+  if (!query) {
+    return true;
+  }
+
+  return normalizeSearchText(task.objective).includes(query)
+    || (Array.isArray(task.finishNotes)
+      && task.finishNotes.some((note) => normalizeSearchText(note.text).includes(query)));
+}
+
+function normalizeSearchText(value) {
+  return String(value || "").toLocaleLowerCase().replace(/\s+/g, " ").trim();
 }
 
 function getUnfinishedTasksByRow(tasks) {
@@ -1970,7 +2004,7 @@ function getUnfinishedActivityBadgeCounts(tasks) {
   });
 }
 
-function createUnfinishedTaskItem(task) {
+function createUnfinishedTaskItem(task, query = "") {
   const item = document.createElement("div");
   item.className = "log-item unfinished-task-item";
   item.classList.toggle("is-active", isTaskRunning(task));
@@ -2003,6 +2037,15 @@ function createUnfinishedTaskItem(task) {
     openButton.appendChild(badges);
   }
 
+  const content = document.createElement("div");
+  content.className = "unfinished-task-content";
+  content.appendChild(openButton);
+
+  const notes = createUnfinishedTaskNotes(task, query);
+  if (notes) {
+    content.appendChild(notes);
+  }
+
   const actions = document.createElement("div");
   actions.className = "log-actions";
 
@@ -2013,8 +2056,37 @@ function createUnfinishedTaskItem(task) {
   startButton.textContent = isTaskRunning(task) ? "Pause" : "Start";
 
   actions.appendChild(startButton);
-  item.append(openButton, actions);
+  item.append(content, actions);
   return item;
+}
+
+function createUnfinishedTaskNotes(task, query = "") {
+  if (!Array.isArray(task.finishNotes) || task.finishNotes.length === 0) {
+    return null;
+  }
+
+  const details = document.createElement("details");
+  details.className = "unfinished-task-notes";
+  details.open = Boolean(query) && task.finishNotes.some((note) => normalizeSearchText(note.text).includes(query));
+
+  const summary = document.createElement("summary");
+  summary.textContent = `Notes (${task.finishNotes.length})`;
+
+  const list = document.createElement("ul");
+  list.className = "unfinished-task-note-list";
+  task.finishNotes
+    .slice()
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    .forEach((note) => {
+      const item = document.createElement("li");
+      item.classList.toggle("is-flagged", note.flagged);
+      item.classList.toggle("is-report-note", note.reported);
+      item.textContent = note.text;
+      list.appendChild(item);
+    });
+
+  details.append(summary, list);
+  return details;
 }
 
 function createUnfinishedTaskBadge(label, modifier = "") {
