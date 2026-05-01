@@ -192,6 +192,10 @@
             <option>Personal</option>
           </select>
         </label>
+        <label class="field" id="taskSendToField" hidden>
+          <span>Send to activity</span>
+          <select id="taskRowSelect"></select>
+        </label>
         <details class="category-helper" id="taskCategoryGuide">
           <summary>Time categories</summary>
           <div class="category-guide-list">
@@ -245,8 +249,8 @@
       <div class="modal-body">
         <div class="modal-header">
           <div>
-            <p class="eyebrow">Task Log</p>
-            <h2 id="timeLogDialogTitle">Time log</h2>
+            <p class="eyebrow">Time log</p>
+            <h2 class="modal-task-title" id="timeLogDialogTitle">Time log</h2>
           </div>
         </div>
         <div class="time-log-list" id="timeLogList"></div>
@@ -263,7 +267,7 @@
         <div class="modal-header">
           <div>
             <p class="eyebrow">Notes</p>
-            <h2 id="finishNoteDialogTitle">Notes</h2>
+            <h2 class="modal-task-title" id="finishNoteDialogTitle">Notes</h2>
           </div>
         </div>
         <div class="time-log-list notes-list" id="finishNoteList"></div>
@@ -453,11 +457,11 @@
           <details class="standup-instructions">
             <summary>Instructions</summary>
             <div class="standup-instructions-content">
-              <p>Set the last standup date to show work logged since that standup. Click bullets in Today or Stuck to mark yellow focus items, which stay saved across opens and represent work you want to make progress on before the next standup or talk about during standup. Click bullets in Did to mark purple report-only highlights.</p>
+              <p>Set the last standup date to show work logged since that standup. Click bullets in Today to mark yellow focus items, which stay saved across opens and represent work you want to make progress on before the next standup. Click bullets in Stuck to mark pink discussion highlights. Notes marked Report in standup appear in Did as purple highlights, and removing the purple highlight removes Report in standup from that note.</p>
               <dl>
                 <div>
                   <dt>What I did since last standup</dt>
-                  <dd>Tasks with time logged since the selected date, grouped by activity. Highlights here are purple report-only highlights.</dd>
+                  <dd>Tasks with time logged since the selected date, plus notes marked Report in standup, grouped by activity. Reported notes appear as purple highlights; dehighlighting one removes Report in standup from that note.</dd>
                 </div>
                 <div>
                   <dt>What I'm doing today</dt>
@@ -465,7 +469,7 @@
                 </div>
                 <div>
                   <dt>What I'm stuck on</dt>
-                  <dd>Flagged notes across all time, regardless of the selected date. Highlights here become yellow focus items.</dd>
+                  <dd>Flagged notes across all time, regardless of the selected date. Highlights here are pink and stay in the standup summary for discussion.</dd>
                 </div>
               </dl>
             </div>

@@ -14,6 +14,8 @@
   --red: #a83d32;
   --red-soft: #f6e5e2;
   --yellow: #f4e4ad;
+  --pink: #f8d7ea;
+  --pink-line: #c45f9c;
   --bucket-admin: #eee8ff;
   --bucket-admin-line: #8e78d7;
   --bucket-operations: #dceeff;
@@ -953,6 +955,15 @@ body.is-board-dragging * {
   background: var(--red-soft);
 }
 
+.log-item.is-report-note {
+  border-color: var(--bucket-admin-line);
+  background: var(--bucket-admin);
+}
+
+.log-item.is-flagged.is-report-note {
+  border-color: var(--red);
+}
+
 .log-item span {
   overflow-wrap: anywhere;
 }
@@ -961,6 +972,12 @@ body.is-board-dragging * {
   border-color: var(--red);
   background: var(--red-soft);
   color: #70251e;
+}
+
+.button-report {
+  border-color: var(--bucket-admin-line);
+  background: var(--bucket-admin);
+  color: #473786;
 }
 
 .empty-log {
@@ -1087,6 +1104,17 @@ body.is-board-dragging * {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+
+.modal-header > div {
+  min-width: 0;
+}
+
+.modal-task-title {
+  max-width: min(760px, 70vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .modal-header-actions {
@@ -1394,6 +1422,7 @@ body.is-board-dragging * {
 .report-preview .standup-summary-item {
   border-radius: 6px;
   cursor: pointer;
+  margin: 3px 0;
   padding: 2px 6px;
 }
 
@@ -1404,6 +1433,11 @@ body.is-board-dragging * {
 .report-preview .standup-summary-item.is-highlighted.is-focus-highlight {
   background: var(--yellow);
   box-shadow: inset 0 0 0 1px #d1b84c;
+}
+
+.report-preview .standup-summary-item.is-highlighted.is-blocker-highlight {
+  background: var(--pink);
+  box-shadow: inset 0 0 0 1px var(--pink-line);
 }
 
 .report-preview .standup-summary-item.is-highlighted.is-report-only {
@@ -1699,6 +1733,40 @@ body.is-board-dragging * {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.note-action-menu {
+  width: max-content;
+}
+
+.note-action-menu summary {
+  min-height: 32px;
+  border: 2px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 4px 10px;
+  background: #ffffff;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 800;
+  list-style-position: inside;
+}
+
+.note-action-menu-items {
+  display: grid;
+  gap: 6px;
+  min-width: 170px;
+  margin-top: 6px;
+  border: 2px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 8px;
+  background: #ffffff;
+  box-shadow: var(--shadow);
+}
+
+.note-action-menu-items .button {
+  justify-content: flex-start;
+  width: 100%;
 }
 
 .log-adjust-group {

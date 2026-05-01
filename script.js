@@ -40,6 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
   cacheElements();
   loadState();
   loadStandupSettings();
+  migrateLegacyStandupHighlightKeys();
   bindEvents();
   initializeBackup();
   render();
@@ -128,6 +129,8 @@ function cacheElements() {
   elements.taskIdInput = document.getElementById("taskIdInput");
   elements.taskPlacementInput = document.getElementById("taskPlacementInput");
   elements.taskRowInput = document.getElementById("taskRowInput");
+  elements.taskSendToField = document.getElementById("taskSendToField");
+  elements.taskRowSelect = document.getElementById("taskRowSelect");
   elements.objectiveInput = document.getElementById("objectiveInput");
   elements.bucketInput = document.getElementById("bucketInput");
   elements.taskCategoryGuide = document.getElementById("taskCategoryGuide");
@@ -480,6 +483,10 @@ function handleDocumentClick(event) {
 
   if (action === "toggle-finish-note-flag") {
     toggleFinishNoteFlag(taskId, actionElement.dataset.noteId);
+  }
+
+  if (action === "toggle-finish-note-report") {
+    toggleFinishNoteReport(taskId, actionElement.dataset.noteId);
   }
 
   if (action === "convert-finish-note-to-task") {
@@ -1096,6 +1103,7 @@ function sanitizeFinishNoteEntry(note) {
     id: String(note.id || createId()),
     text,
     flagged: note.flagged === true,
+    reported: note.reported === true,
     createdAt: note.createdAt || new Date().toISOString(),
   };
 }
@@ -1202,8 +1210,9 @@ function render() {
     track.className = "task-track";
     track.dataset.rowIndex = String(rowIndex);
 
-    const activeTasks = tasks.filter((task) => task.status !== "finished");
-    const completedTasks = tasks.filter((task) => task.status === "finished");
+    const displayTasks = getBoardDisplayTasks(tasks);
+    const activeTasks = displayTasks.filter((task) => task.status !== "finished");
+    const completedTasks = displayTasks.filter((task) => task.status === "finished");
 
     activeTasks.forEach((task) => {
       track.appendChild(createTaskCard(task));
@@ -1248,6 +1257,40 @@ function getRows() {
 
   rows.forEach((row) => row.sort((a, b) => a.order - b.order));
   return rows;
+}
+
+function getBoardDisplayTasks(tasks) {
+  return [...tasks].sort(compareBoardTaskDisplayOrder);
+}
+
+function compareBoardTaskDisplayOrder(a, b) {
+  const statusComparison = Number(a.status === "finished") - Number(b.status === "finished");
+  if (statusComparison) {
+    return statusComparison;
+  }
+
+  const urgentComparison = Number(b.urgent) - Number(a.urgent);
+  if (urgentComparison) {
+    return urgentComparison;
+  }
+
+  if (a.urgent && b.urgent) {
+    return a.order - b.order;
+  }
+
+  const aIsFocused = isTaskHighlightedInStandup(a);
+  const bIsFocused = isTaskHighlightedInStandup(b);
+  const focusComparison = Number(bIsFocused) - Number(aIsFocused);
+  if (focusComparison) {
+    return focusComparison;
+  }
+
+  if (aIsFocused && bIsFocused) {
+    return a.order - b.order;
+  }
+
+  const runningComparison = Number(isTaskRunning(b)) - Number(isTaskRunning(a));
+  return runningComparison || a.order - b.order;
 }
 
 function getRowName(rowIndex) {
@@ -1347,6 +1390,12 @@ function taskHasFlaggedNotes(task) {
   return Array.isArray(task.finishNotes) && task.finishNotes.some((note) => note.flagged);
 }
 
+function setTaskModalTitle(titleElement, task) {
+  const title = `${getRowName(task.row)} / ${task.objective}`;
+  titleElement.textContent = title;
+  titleElement.title = title;
+}
+
 function renderTimeLogModal() {
   const task = findTask(activeTimeLogTaskId);
   if (!task) {
@@ -1355,7 +1404,7 @@ function renderTimeLogModal() {
     return;
   }
 
-  elements.timeLogDialogTitle.textContent = task.objective;
+  setTaskModalTitle(elements.timeLogDialogTitle, task);
   elements.timeLogList.innerHTML = "";
 
   if (task.logs.length === 0) {
@@ -1468,7 +1517,7 @@ function renderFinishNoteModal() {
     return;
   }
 
-  elements.finishNoteDialogTitle.textContent = task.objective;
+  setTaskModalTitle(elements.finishNoteDialogTitle, task);
   elements.finishNoteList.innerHTML = "";
 
   if (task.finishNotes.length === 0) {
@@ -1483,6 +1532,7 @@ function renderFinishNoteModal() {
     const item = document.createElement("div");
     item.className = "log-item";
     item.classList.toggle("is-flagged", note.flagged);
+    item.classList.toggle("is-report-note", note.reported);
     item.dataset.taskId = task.id;
 
     const details = document.createElement("span");
@@ -1504,7 +1554,15 @@ function renderFinishNoteModal() {
     flagButton.dataset.action = "toggle-finish-note-flag";
     flagButton.dataset.noteId = note.id;
     flagButton.type = "button";
-    flagButton.textContent = note.flagged ? "Unflag" : "Flag";
+    flagButton.textContent = note.flagged ? "Remove elevation flag" : "Flag for elevation";
+
+    const reportButton = document.createElement("button");
+    reportButton.className = "button button-small";
+    reportButton.classList.toggle("button-report", note.reported);
+    reportButton.dataset.action = "toggle-finish-note-report";
+    reportButton.dataset.noteId = note.id;
+    reportButton.type = "button";
+    reportButton.textContent = note.reported ? "Remove from standup" : "Report in standup";
 
     const convertButton = document.createElement("button");
     convertButton.className = "button button-small button-secondary";
@@ -1520,7 +1578,16 @@ function renderFinishNoteModal() {
     deleteButton.type = "button";
     deleteButton.textContent = "Delete";
 
-    actions.append(editButton, flagButton, convertButton, deleteButton);
+    const actionMenu = document.createElement("details");
+    actionMenu.className = "note-action-menu";
+    const actionSummary = document.createElement("summary");
+    actionSummary.textContent = "Actions";
+    const actionMenuItems = document.createElement("div");
+    actionMenuItems.className = "note-action-menu-items";
+    actionMenuItems.append(editButton, flagButton, reportButton, convertButton, deleteButton);
+    actionMenu.append(actionSummary, actionMenuItems);
+
+    actions.appendChild(actionMenu);
     item.append(details, actions);
     elements.finishNoteList.appendChild(item);
   });
@@ -1552,6 +1619,9 @@ function toggleFinishNoteFlag(taskId, noteId) {
   }
 
   note.flagged = !note.flagged;
+  if (!note.flagged) {
+    removeStandupHighlightKey(getStandupBlockerHighlightKey(task, note.id));
+  }
   saveState();
 
   if (activeFinishNoteTaskId === taskId) {
@@ -1567,6 +1637,36 @@ function toggleFinishNoteFlag(taskId, noteId) {
   }
 
   updateFlaggedNotesButton();
+  render();
+}
+
+function toggleFinishNoteReport(taskId, noteId) {
+  const task = findTask(taskId);
+  const note = task?.finishNotes.find((candidate) => candidate.id === noteId);
+  if (!task || !note) {
+    return;
+  }
+
+  note.reported = !note.reported;
+  if (note.reported) {
+    addStandupHighlightKey(getStandupReportedNoteHighlightKey(task, note.id));
+  } else {
+    removeStandupHighlightKey(getStandupReportedNoteHighlightKey(task, note.id));
+  }
+  saveState();
+
+  if (activeFinishNoteTaskId === taskId) {
+    renderFinishNoteModal();
+  }
+
+  if (elements.goalNotesDialog.open) {
+    renderGoalNotesModal();
+  }
+
+  if (elements.standupSummaryDialog.open) {
+    renderStandupSummaryPreview();
+  }
+
   render();
 }
 
@@ -1950,7 +2050,7 @@ function getUnfinishedTasks() {
   return getSortedTasks().filter((task) => task.status !== "finished");
 }
 
-function openFlaggedNote(taskId, noteId) {
+function openFlaggedNote(taskId) {
   const task = findTask(taskId);
   if (!task) {
     return;
@@ -1959,7 +2059,7 @@ function openFlaggedNote(taskId, noteId) {
   closeDialog(elements.flaggedNotesDialog);
   scrollToRow(task.row);
   window.setTimeout(() => {
-    openFinishNoteDialog(taskId, noteId);
+    openFinishNoteDialog(taskId);
   }, 360);
 }
 
@@ -2286,12 +2386,15 @@ function createRow(name) {
 }
 
 function openTaskDialog(mode, placement, task = null, rowIndex = "") {
+  ensureRowsForTasks();
   elements.taskDialogTitle.textContent = mode === "edit" ? "Edit task" : "Add task";
   elements.taskIdInput.value = task?.id || "";
   elements.taskPlacementInput.value = placement;
   elements.taskRowInput.value = task ? String(task.row) : rowIndex === "" ? "" : String(rowIndex);
   elements.objectiveInput.value = task?.objective || "";
   elements.bucketInput.value = task?.bucket || "";
+  populateTaskRowSelect(task?.row ?? rowIndex);
+  elements.taskSendToField.hidden = mode !== "edit" || !task;
   elements.deleteTaskDialogButton.hidden = mode !== "edit" || !task;
   elements.saveUrgentTaskDialogButton.hidden = mode === "edit";
   elements.taskCategoryGuide.hidden = placement !== "side";
@@ -2300,12 +2403,29 @@ function openTaskDialog(mode, placement, task = null, rowIndex = "") {
   elements.objectiveInput.focus();
 }
 
+function populateTaskRowSelect(selectedRowIndex = "") {
+  const selectedValue = selectedRowIndex === "" ? "" : String(selectedRowIndex);
+  elements.taskRowSelect.innerHTML = "";
+
+  state.rows.forEach((row, rowIndex) => {
+    const option = document.createElement("option");
+    option.value = String(rowIndex);
+    option.textContent = `Priority ${rowIndex + 1} - ${row.name}`;
+    elements.taskRowSelect.appendChild(option);
+  });
+
+  if (selectedValue !== "" && state.rows[Number(selectedValue)]) {
+    elements.taskRowSelect.value = selectedValue;
+  }
+}
+
 function saveTaskFromDialog(event) {
   event.preventDefault();
 
   const id = elements.taskIdInput.value;
   const placement = elements.taskPlacementInput.value;
   const rowIndex = elements.taskRowInput.value === "" ? null : Number(elements.taskRowInput.value);
+  const selectedRowIndex = elements.taskRowSelect.value === "" ? null : Number(elements.taskRowSelect.value);
   const objective = elements.objectiveInput.value.trim();
   const bucket = elements.bucketInput.value;
   const submitAction = event.submitter?.value || "save";
@@ -2320,8 +2440,13 @@ function saveTaskFromDialog(event) {
   if (id) {
     const task = findTask(id);
     if (task) {
+      const previousObjective = task.objective;
       task.objective = objective;
       task.bucket = bucket;
+      migrateStandupHighlightKeysForRenamedTask(task, previousObjective);
+      if (Number.isInteger(selectedRowIndex) && state.rows[selectedRowIndex]) {
+        sendTaskToRow(task, selectedRowIndex);
+      }
       savedTask = task;
     }
   } else {
@@ -2342,6 +2467,132 @@ function saveTaskFromDialog(event) {
   saveState();
   closeDialog(elements.taskDialog);
   render();
+}
+
+function migrateStandupHighlightKeysForRenamedTask(task, previousObjective) {
+  if (!task?.id || !previousObjective) {
+    return;
+  }
+
+  let changed = false;
+  const replacements = new Map([
+    [`since:${previousObjective}`, `since:${task.id}`],
+    [`today:${previousObjective}`, `today:${task.id}`],
+  ]);
+
+  replacements.forEach((newKey, oldKey) => {
+    if (!standupHighlightedKeys.has(oldKey)) {
+      return;
+    }
+
+    standupHighlightedKeys.delete(oldKey);
+    standupHighlightedKeys.add(newKey);
+    changed = true;
+  });
+
+  if (standupHighlightedKeys.delete(`blocker:${previousObjective}`)) {
+    task.finishNotes
+      .filter((note) => note.flagged)
+      .forEach((note) => {
+        standupHighlightedKeys.add(`blocker:${task.id}:${note.id}`);
+      });
+    changed = true;
+  }
+
+  if (changed) {
+    saveStandupSettings();
+  }
+}
+
+function migrateLegacyStandupHighlightKeys() {
+  let changed = false;
+  state.tasks.forEach((task) => {
+    migrateStandupHighlightKeysForRenamedTask(task, task.objective);
+    task.finishNotes
+      .filter((note) => note.reported)
+      .forEach((note) => {
+        const key = getStandupReportedNoteHighlightKey(task, note.id);
+        if (!standupHighlightedKeys.has(key)) {
+          standupHighlightedKeys.add(key);
+          changed = true;
+        }
+      });
+  });
+
+  if (changed) {
+    saveStandupSettings();
+  }
+}
+
+function removeStandupHighlightKey(key) {
+  if (!key || !standupHighlightedKeys.delete(key)) {
+    return false;
+  }
+
+  saveStandupSettings();
+  return true;
+}
+
+function addStandupHighlightKey(key) {
+  if (!key || standupHighlightedKeys.has(key)) {
+    return false;
+  }
+
+  standupHighlightedKeys.add(key);
+  saveStandupSettings();
+  return true;
+}
+
+function removeStandupHighlightKeysForNote(task, noteId) {
+  if (!task?.id || !noteId) {
+    return;
+  }
+
+  let changed = false;
+  [
+    getStandupBlockerHighlightKey(task, noteId),
+    getStandupReportedNoteHighlightKey(task, noteId),
+  ].forEach((key) => {
+    changed = standupHighlightedKeys.delete(key) || changed;
+  });
+
+  if (changed) {
+    saveStandupSettings();
+  }
+}
+
+function removeStandupHighlightKeysForTask(task) {
+  if (!task?.id) {
+    return;
+  }
+
+  let changed = false;
+  [...standupHighlightedKeys].forEach((key) => {
+    const shouldRemove = key === `today:${task.id}`
+      || key === `since:${task.id}`
+      || key.startsWith(`blocker:${task.id}:`)
+      || key.startsWith(`since:${task.id}:`);
+    if (!shouldRemove) {
+      return;
+    }
+
+    standupHighlightedKeys.delete(key);
+    changed = true;
+  });
+
+  if (changed) {
+    saveStandupSettings();
+  }
+}
+
+function sendTaskToRow(task, rowIndex) {
+  if (!task || !Number.isInteger(rowIndex) || !state.rows[rowIndex] || task.row === rowIndex) {
+    return;
+  }
+
+  const order = getNextOrder(rowIndex);
+  task.row = rowIndex;
+  task.order = order;
 }
 
 function createTask({ objective, bucket, placement, rowIndex }) {
@@ -2496,6 +2747,7 @@ function saveFinishNoteFromDialog(event) {
       id: createId(),
       text: noteText,
       flagged: false,
+      reported: false,
       createdAt: new Date().toISOString(),
     });
   }
@@ -2856,6 +3108,7 @@ function deleteTask(taskId) {
     return false;
   }
 
+  removeStandupHighlightKeysForTask(task);
   state.tasks = state.tasks.filter((candidate) => candidate.id !== taskId);
   normalizeBoard();
   saveState();
@@ -2956,6 +3209,7 @@ function convertFinishNoteToTask(taskId, noteId) {
     rowIndex: sourceTask.row,
   });
   state.tasks.push(convertedTask);
+  removeStandupHighlightKeysForNote(sourceTask, noteId);
   sourceTask.finishNotes = sourceTask.finishNotes.filter((candidate) => candidate.id !== noteId);
   normalizeBoard();
   saveState();
@@ -2989,6 +3243,7 @@ function deleteFinishNote(taskId, noteId) {
     return;
   }
 
+  removeStandupHighlightKeysForNote(task, noteId);
   task.finishNotes = task.finishNotes.filter((note) => note.id !== noteId);
   saveState();
   if (activeFinishNoteTaskId === taskId) {
@@ -3339,6 +3594,7 @@ function createStandupSummaryItem(item, formatter, sectionKey) {
   listItem.classList.toggle("is-highlighted", isHighlighted);
   listItem.classList.toggle("is-report-only", isReportOnlyStandupSection(sectionKey));
   listItem.classList.toggle("is-focus-highlight", isFocusStandupSection(sectionKey));
+  listItem.classList.toggle("is-blocker-highlight", sectionKey === "blocker");
   listItem.dataset.standupKey = itemKey;
   listItem.tabIndex = 0;
   listItem.setAttribute("role", "button");
@@ -3379,14 +3635,18 @@ function toggleStandupSummaryItemHighlight(item) {
   const shouldHighlight = !standupHighlightedKeys.has(key);
   if (shouldHighlight) {
     standupHighlightedKeys.add(key);
-  } else if (isFocusStandupHighlightKey(key)) {
-    removeFocusStandupHighlightsForTask(getTaskIdFromStandupHighlightKey(key));
   } else {
     standupHighlightedKeys.delete(key);
   }
 
+  const reportSyncChanged = syncReportedNoteFromStandupHighlightKey(key, shouldHighlight);
   saveStandupSettings();
-  syncStandupSummaryHighlightItems();
+  if (reportSyncChanged) {
+    saveState();
+    renderStandupSummaryPreview();
+  } else {
+    syncStandupSummaryHighlightItems();
+  }
   render();
 }
 
@@ -3400,33 +3660,29 @@ function syncStandupSummaryHighlightItems() {
     });
 }
 
-function removeFocusStandupHighlightsForTask(taskId) {
-  if (!taskId) {
-    return;
+function getStandupBlockerHighlightKey(task, noteId) {
+  return `blocker:${task.id}:${noteId}`;
+}
+
+function getStandupReportedNoteHighlightKey(task, noteId) {
+  return `since:${task.id}:${noteId}`;
+}
+
+function syncReportedNoteFromStandupHighlightKey(key, isHighlighted) {
+  const match = typeof key === "string" ? key.match(/^since:([^:]+):([^:]+)$/) : null;
+  if (!match) {
+    return false;
   }
 
-  [...standupHighlightedKeys]
-    .filter((key) => isFocusStandupHighlightKey(key) && getTaskIdFromStandupHighlightKey(key) === taskId)
-    .forEach((key) => {
-      standupHighlightedKeys.delete(key);
-    });
-}
-
-function isFocusStandupHighlightKey(key) {
-  return isFocusStandupSection(getStandupSectionFromKey(key));
-}
-
-function getStandupSectionFromKey(key) {
-  return typeof key === "string" ? key.split(":")[0] || "" : "";
-}
-
-function getTaskIdFromStandupHighlightKey(key) {
-  if (typeof key !== "string") {
-    return "";
+  const [, taskId, noteId] = match;
+  const task = findTask(taskId);
+  const note = task?.finishNotes.find((candidate) => candidate.id === noteId);
+  if (!note || note.reported === isHighlighted) {
+    return false;
   }
 
-  const [section, taskId] = key.split(":");
-  return section === "since" || section === "today" || section === "blocker" ? taskId || "" : "";
+  note.reported = isHighlighted;
+  return true;
 }
 
 function isTaskHighlightedInStandup(task) {
@@ -3434,12 +3690,7 @@ function isTaskHighlightedInStandup(task) {
     return false;
   }
 
-  return [...standupHighlightedKeys].some((key) => isStandupHighlightKeyForTask(key, task.id));
-}
-
-function isStandupHighlightKeyForTask(key, taskId) {
-  return key === `today:${taskId}`
-    || key.startsWith(`blocker:${taskId}:`);
+  return task.status !== "finished" && standupHighlightedKeys.has(`today:${task.id}`);
 }
 
 function buildStandupSummary() {
@@ -3454,7 +3705,7 @@ function buildStandupSummary() {
     .map(createStandupTaskEntry);
 
   return {
-    sinceLastStandupTasks: getStandupTasksSince(rangeStart, rangeEnd),
+    sinceLastStandupTasks: getStandupDidEntries(rangeStart, rangeEnd),
     todayTasks: [...urgentTasks, ...prioritizedTasks],
     blockers: getFlaggedNotes().map(({ task, note }) => ({
       id: `${task.id}:${note.id}`,
@@ -3463,6 +3714,29 @@ function buildStandupSummary() {
       note: note.text,
     })),
   };
+}
+
+function getStandupDidEntries(rangeStart, rangeEnd) {
+  return [
+    ...getStandupTasksSince(rangeStart, rangeEnd),
+    ...getReportedStandupNotes(),
+  ].sort((a, b) => a.row - b.row || a.sortTime - b.sortTime || a.order - b.order);
+}
+
+function getReportedStandupNotes() {
+  return getSortedTasks()
+    .flatMap((task) => task.finishNotes
+      .filter((note) => note.reported)
+      .map((note) => ({
+        id: `${task.id}:${note.id}`,
+        type: "reported-note",
+        row: task.row,
+        order: task.order,
+        objective: task.objective,
+        activity: getRowName(task.row),
+        note: note.text,
+        sortTime: new Date(note.createdAt || task.createdAt || Date.now()).getTime(),
+      })));
 }
 
 function getStandupTasksSince(rangeStart, rangeEnd) {
@@ -3526,6 +3800,10 @@ function createStandupTaskEntry(task) {
 }
 
 function formatStandupGroupedCompletedTask(entry) {
+  if (entry.type === "reported-note") {
+    return entry.note;
+  }
+
   return `${entry.objective} - ${formatDuration(entry.durationMs)}${entry.isFinished ? " - Finished" : ""}`;
 }
 
@@ -3983,14 +4261,7 @@ function normalizeBoard() {
   ensureRowsForTasks();
   const rows = getRows();
   rows.forEach((row, rowIndex) => {
-    const sortedRow = [...row].sort((a, b) => {
-      const statusComparison = Number(a.status === "finished") - Number(b.status === "finished");
-      const runningComparison = Number(isTaskRunning(b)) - Number(isTaskRunning(a));
-      const urgentComparison = Number(b.urgent) - Number(a.urgent);
-      return statusComparison || runningComparison || urgentComparison || a.order - b.order;
-    });
-
-    sortedRow.forEach((task, orderIndex) => {
+    row.forEach((task, orderIndex) => {
       task.row = rowIndex;
       task.order = orderIndex;
     });
