@@ -3333,13 +3333,16 @@ function getStandupProjectGroups(items) {
 
 function createStandupSummaryItem(item, formatter, sectionKey) {
   const itemKey = getStandupSummaryItemKey(sectionKey, item);
+  const isHighlighted = standupHighlightedKeys.has(itemKey);
   const listItem = document.createElement("li");
   listItem.className = "standup-summary-item";
-  listItem.classList.toggle("is-highlighted", standupHighlightedKeys.has(itemKey));
+  listItem.classList.toggle("is-highlighted", isHighlighted);
+  listItem.classList.toggle("is-report-only", isReportOnlyStandupSection(sectionKey));
+  listItem.classList.toggle("is-focus-highlight", isFocusStandupSection(sectionKey));
   listItem.dataset.standupKey = itemKey;
   listItem.tabIndex = 0;
   listItem.setAttribute("role", "button");
-  listItem.setAttribute("aria-pressed", String(standupHighlightedKeys.has(itemKey)));
+  listItem.setAttribute("aria-pressed", String(isHighlighted));
   listItem.textContent = formatter(item);
   listItem.addEventListener("click", () => {
     toggleStandupSummaryItemHighlight(listItem);
@@ -3357,6 +3360,14 @@ function createStandupSummaryItem(item, formatter, sectionKey) {
 
 function getStandupSummaryItemKey(sectionKey, item) {
   return `${sectionKey}:${item.id || item.objective || item.note || "item"}`;
+}
+
+function isReportOnlyStandupSection(sectionKey) {
+  return sectionKey === "since";
+}
+
+function isFocusStandupSection(sectionKey) {
+  return sectionKey === "today" || sectionKey === "blocker";
 }
 
 function toggleStandupSummaryItemHighlight(item) {
@@ -3385,8 +3396,7 @@ function isTaskHighlightedInStandup(task) {
 }
 
 function isStandupHighlightKeyForTask(key, taskId) {
-  return key === `since:${taskId}`
-    || key === `today:${taskId}`
+  return key === `today:${taskId}`
     || key.startsWith(`blocker:${taskId}:`);
 }
 
