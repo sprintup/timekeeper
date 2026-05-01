@@ -3,6 +3,14 @@ const APP_TITLE = "Timekeeper";
 const BUCKETS = ["Admin", "Operations", "Projects", "Personal"];
 const DEFAULT_TIME_GOAL_MS = 8 * 60 * 60 * 1000;
 const LOG_ADJUSTMENT_MS = 60 * 1000;
+const DEFAULT_BACKUP_AUTOSAVE_MINUTES = 60;
+const BACKUP_DB_NAME = "timekeeper.backup.v1";
+const BACKUP_STORE_NAME = "file-handles";
+const BACKUP_HANDLE_KEY = "backup-directory";
+const BACKUP_META_KEY = "timekeeper.backup.meta.v1";
+const BACKUP_SETTINGS_KEY = "timekeeper.backup.settings.v1";
+const BACKUP_FILE_PREFIX = "bk-timekeeper";
+const STANDUP_SETTINGS_KEY = "timekeeper.standup.settings.v1";
 
 const state = {
   tasks: [],
@@ -20,12 +28,20 @@ let activeGoalNotesRowId = null;
 let pendingFinishCancelSnapshot = null;
 let previousGoalRemainingMs = null;
 let chimeAudioContext = null;
+let backupDirectoryHandle = null;
+let backupAutoSaveTimer = null;
+let backupSaveInProgress = false;
+let backupAutoSaveMinutes = DEFAULT_BACKUP_AUTOSAVE_MINUTES;
+let standupLastDate = "";
+let standupHighlightedKeys = new Set();
 
 document.addEventListener("DOMContentLoaded", () => {
   updateDocumentTitle();
   cacheElements();
   loadState();
+  loadStandupSettings();
   bindEvents();
+  initializeBackup();
   render();
   updateDate();
   updateScrollTopButton();
@@ -88,12 +104,19 @@ function cacheElements() {
   elements.goalTotals = document.getElementById("goalTotals");
   elements.urgentIndicator = document.getElementById("urgentIndicator");
   elements.urgentIndicatorText = document.getElementById("urgentIndicatorText");
-  elements.goalCountPill = document.getElementById("goalCountPill");
   elements.unfinishedTaskCountPill = document.getElementById("unfinishedTaskCountPill");
   elements.generateReportButton = document.getElementById("generateReportButton");
   elements.exportDataButton = document.getElementById("exportDataButton");
   elements.importDataButton = document.getElementById("importDataButton");
   elements.importDataInput = document.getElementById("importDataInput");
+  elements.settingsButton = document.getElementById("settingsButton");
+  elements.settingsDialog = document.getElementById("settingsDialog");
+  elements.chooseBackupDirectoryButton = document.getElementById("chooseBackupDirectoryButton");
+  elements.saveBackupNowButton = document.getElementById("saveBackupNowButton");
+  elements.backupStatus = document.getElementById("backupStatus");
+  elements.backupFileName = document.getElementById("backupFileName");
+  elements.backupIntervalForm = document.getElementById("backupIntervalForm");
+  elements.backupIntervalMinutesInput = document.getElementById("backupIntervalMinutesInput");
   elements.resetStateButton = document.getElementById("resetStateButton");
   elements.scrollTopButton = document.getElementById("scrollTopButton");
   elements.flaggedNotesButton = document.getElementById("flaggedNotesButton");
@@ -146,6 +169,8 @@ function cacheElements() {
   elements.flaggedNotesList = document.getElementById("flaggedNotesList");
   elements.urgentTasksDialog = document.getElementById("urgentTasksDialog");
   elements.urgentTasksList = document.getElementById("urgentTasksList");
+  elements.unfinishedTasksDialog = document.getElementById("unfinishedTasksDialog");
+  elements.unfinishedTasksList = document.getElementById("unfinishedTasksList");
   elements.goalNotesDialog = document.getElementById("goalNotesDialog");
   elements.goalNotesDialogTitle = document.getElementById("goalNotesDialogTitle");
   elements.goalNotesList = document.getElementById("goalNotesList");
@@ -160,8 +185,7 @@ function cacheElements() {
   elements.deleteAfterReportInput = document.getElementById("deleteAfterReportInput");
   elements.standupSummaryDialog = document.getElementById("standupSummaryDialog");
   elements.standupSummaryPreview = document.getElementById("standupSummaryPreview");
-  elements.copyStandupSummaryButton = document.getElementById("copyStandupSummaryButton");
-  elements.standupSummaryCopyStatus = document.getElementById("standupSummaryCopyStatus");
+  elements.lastStandupDateInput = document.getElementById("lastStandupDateInput");
 }
 
 function bindEvents() {
@@ -170,6 +194,10 @@ function bindEvents() {
   elements.exportDataButton.addEventListener("click", exportData);
   elements.importDataButton.addEventListener("click", () => elements.importDataInput.click());
   elements.importDataInput.addEventListener("change", importDataFromFile);
+  elements.settingsButton?.addEventListener("click", openSettingsDialog);
+  elements.chooseBackupDirectoryButton?.addEventListener("click", chooseBackupDirectory);
+  elements.saveBackupNowButton?.addEventListener("click", () => saveBackupNow("manual"));
+  elements.backupIntervalForm?.addEventListener("submit", saveBackupIntervalFromForm);
   elements.resetStateButton.addEventListener("click", resetStateWithPrompt);
   elements.timeGoalForm.addEventListener("submit", saveTimeGoalFromForm);
   elements.clearTimeGoalButton.addEventListener("click", clearTimeGoal);
@@ -186,9 +214,10 @@ function bindEvents() {
   elements.reportForm.addEventListener("submit", downloadReportFromDialog);
   elements.emailReportButton.addEventListener("click", emailReportFromDialog);
   elements.copyReportButton.addEventListener("click", copyReportFromDialog);
-  elements.copyStandupSummaryButton?.addEventListener("click", copyStandupSummaryFromDialog);
+  elements.lastStandupDateInput?.addEventListener("change", saveLastStandupDateFromInput);
   elements.flaggedNotesButton.addEventListener("click", openFlaggedNotesDialog);
   elements.urgentIndicator.addEventListener("click", openUrgentTasksDialog);
+  elements.unfinishedTaskCountPill.addEventListener("click", openUnfinishedTasksDialog);
   elements.scrollTopButton.addEventListener("click", scrollToTop);
 
   document.addEventListener("click", handleDocumentClick);
@@ -255,6 +284,21 @@ function handleDocumentClick(event) {
     return;
   }
 
+  if (action === "close-unfinished-tasks-dialog") {
+    closeDialog(elements.unfinishedTasksDialog);
+    return;
+  }
+
+  if (action === "expand-unfinished-tasks") {
+    setUnfinishedTaskGroupsOpen(true);
+    return;
+  }
+
+  if (action === "collapse-unfinished-tasks") {
+    setUnfinishedTaskGroupsOpen(false);
+    return;
+  }
+
   if (action === "close-goal-notes-dialog") {
     activeGoalNotesRowId = null;
     closeDialog(elements.goalNotesDialog);
@@ -268,6 +312,11 @@ function handleDocumentClick(event) {
 
   if (action === "close-standup-summary-dialog") {
     closeDialog(elements.standupSummaryDialog);
+    return;
+  }
+
+  if (action === "close-settings-dialog") {
+    closeDialog(elements.settingsDialog);
     return;
   }
 
@@ -332,6 +381,11 @@ function handleDocumentClick(event) {
     return;
   }
 
+  if (action === "open-unfinished-task") {
+    openUnfinishedTask(actionElement.dataset.taskId);
+    return;
+  }
+
   if (action === "add-side-quest") {
     openTaskDialog("add", "side", null, Number(actionElement.dataset.rowIndex));
     return;
@@ -365,6 +419,7 @@ function handleDocumentClick(event) {
   }
 
   if (action === "toggle-timer") {
+    closeDialog(elements.unfinishedTasksDialog);
     toggleTimer(taskId);
   }
 
@@ -425,6 +480,10 @@ function handleDocumentClick(event) {
 
   if (action === "toggle-finish-note-flag") {
     toggleFinishNoteFlag(taskId, actionElement.dataset.noteId);
+  }
+
+  if (action === "convert-finish-note-to-task") {
+    convertFinishNoteToTask(taskId, actionElement.dataset.noteId);
   }
 
   if (action === "delete-finish-note") {
@@ -521,6 +580,371 @@ function exportData() {
   URL.revokeObjectURL(url);
 }
 
+function openSettingsDialog() {
+  updateBackupSettingsView();
+  openDialog(elements.settingsDialog);
+}
+
+function initializeBackup() {
+  if (!elements.chooseBackupDirectoryButton || !elements.saveBackupNowButton) {
+    return;
+  }
+
+  backupAutoSaveMinutes = getStoredBackupAutoSaveMinutes();
+  updateBackupSettingsView();
+  updateBackupControls();
+  if (!isBackupDirectoryAccessSupported()) {
+    setBackupStatus("Folder backups need Chrome or Edge on HTTPS or localhost.");
+    return;
+  }
+
+  restoreBackupDirectoryHandle();
+  startBackupAutoSaveTimer();
+}
+
+function isBackupDirectoryAccessSupported() {
+  return typeof window.showDirectoryPicker === "function" && "indexedDB" in window;
+}
+
+async function restoreBackupDirectoryHandle() {
+  try {
+    backupDirectoryHandle = await getStoredBackupDirectoryHandle();
+  } catch (error) {
+    setBackupStatus("Backup folder permission could not be restored.");
+  }
+
+  updateBackupControls();
+  if (!backupDirectoryHandle) {
+    setBackupStatus("Choose a backup folder to enable auto-save.");
+    return;
+  }
+
+  const hasPermission = await verifyBackupPermission(backupDirectoryHandle, false);
+  if (hasPermission) {
+    setBackupStatus(formatBackupReadyStatus(await getLatestBackupMetadata()));
+  } else {
+    setBackupStatus("Backup folder needs permission. Use Save backup now.");
+  }
+}
+
+async function chooseBackupDirectory() {
+  if (!isBackupDirectoryAccessSupported()) {
+    setBackupStatus("Folder backups need Chrome or Edge on HTTPS or localhost.");
+    return;
+  }
+
+  try {
+    backupDirectoryHandle = await window.showDirectoryPicker({
+      mode: "readwrite",
+    });
+    await storeBackupDirectoryHandle(backupDirectoryHandle);
+    updateBackupControls();
+    await saveBackupNow("manual");
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      return;
+    }
+
+    backupDirectoryHandle = null;
+    updateBackupControls();
+    setBackupStatus("Backup folder was not set.");
+  }
+}
+
+function startBackupAutoSaveTimer() {
+  if (backupAutoSaveTimer) {
+    window.clearInterval(backupAutoSaveTimer);
+  }
+
+  backupAutoSaveTimer = window.setInterval(() => {
+    saveBackupNow("auto");
+  }, getBackupAutoSaveMs());
+}
+
+async function saveBackupNow(source = "manual") {
+  if (!backupDirectoryHandle) {
+    if (source === "manual") {
+      setBackupStatus("Choose a backup folder first.");
+    }
+    updateBackupControls();
+    return;
+  }
+
+  if (backupSaveInProgress) {
+    if (source === "manual") {
+      setBackupStatus("Backup already in progress.");
+    }
+    return;
+  }
+
+  backupSaveInProgress = true;
+  updateBackupControls();
+
+  try {
+    const hasPermission = await verifyBackupPermission(backupDirectoryHandle, source === "manual");
+    if (!hasPermission) {
+      setBackupStatus("Backup permission needed. Use Backup folder to choose it again.");
+      return;
+    }
+
+    saveState();
+    const backupDate = new Date();
+    const backupFileName = getBackupFileName(backupDate);
+    const payload = createExportPayload();
+    const fileHandle = await backupDirectoryHandle.getFileHandle(backupFileName, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(JSON.stringify(payload, null, 2));
+    await writable.close();
+    storeBackupMetadata(backupDate, backupFileName, source);
+    setBackupStatus(formatBackupSavedStatus(backupDate));
+  } catch (error) {
+    setBackupStatus("Backup save failed.");
+  } finally {
+    backupSaveInProgress = false;
+    updateBackupControls();
+  }
+}
+
+async function verifyBackupPermission(fileHandle, shouldRequest) {
+  if (!fileHandle) {
+    return false;
+  }
+
+  const options = { mode: "readwrite" };
+  if (typeof fileHandle.queryPermission === "function") {
+    const currentPermission = await fileHandle.queryPermission(options);
+    if (currentPermission === "granted") {
+      return true;
+    }
+  }
+
+  if (shouldRequest && typeof fileHandle.requestPermission === "function") {
+    return await fileHandle.requestPermission(options) === "granted";
+  }
+
+  return false;
+}
+
+function updateBackupControls() {
+  const supported = isBackupDirectoryAccessSupported();
+  if (elements.chooseBackupDirectoryButton) {
+    elements.chooseBackupDirectoryButton.disabled = !supported;
+  }
+
+  if (elements.saveBackupNowButton) {
+    elements.saveBackupNowButton.disabled = !supported || !backupDirectoryHandle || backupSaveInProgress;
+  }
+}
+
+function setBackupStatus(message) {
+  if (!elements.backupStatus) {
+    return;
+  }
+
+  elements.backupStatus.textContent = message;
+  elements.backupStatus.hidden = !message;
+}
+
+async function saveBackupIntervalFromForm(event) {
+  event.preventDefault();
+
+  const minutes = sanitizeBackupAutoSaveMinutes(elements.backupIntervalMinutesInput.value);
+  backupAutoSaveMinutes = minutes;
+  storeBackupAutoSaveMinutes(minutes);
+  updateBackupSettingsView();
+  startBackupAutoSaveTimer();
+  setBackupStatus(formatBackupReadyStatus(await getLatestBackupMetadata()));
+}
+
+function updateBackupSettingsView() {
+  if (elements.backupIntervalMinutesInput) {
+    elements.backupIntervalMinutesInput.value = String(backupAutoSaveMinutes);
+  }
+
+  if (elements.backupFileName) {
+    elements.backupFileName.textContent = getBackupFileName();
+  }
+}
+
+function getStoredBackupAutoSaveMinutes() {
+  const stored = window.localStorage.getItem(BACKUP_SETTINGS_KEY);
+  if (!stored) {
+    return DEFAULT_BACKUP_AUTOSAVE_MINUTES;
+  }
+
+  try {
+    const parsed = JSON.parse(stored);
+    return sanitizeBackupAutoSaveMinutes(parsed.autoSaveMinutes);
+  } catch (error) {
+    return DEFAULT_BACKUP_AUTOSAVE_MINUTES;
+  }
+}
+
+function storeBackupAutoSaveMinutes(minutes) {
+  window.localStorage.setItem(BACKUP_SETTINGS_KEY, JSON.stringify({
+    autoSaveMinutes: minutes,
+  }));
+}
+
+function sanitizeBackupAutoSaveMinutes(value) {
+  const minutes = Number(value);
+  return Number.isFinite(minutes) && minutes >= 1
+    ? Math.floor(minutes)
+    : DEFAULT_BACKUP_AUTOSAVE_MINUTES;
+}
+
+function getBackupAutoSaveMs() {
+  return backupAutoSaveMinutes * 60 * 1000;
+}
+
+function formatBackupInterval(ms) {
+  const seconds = Math.round(ms / 1000);
+  if (seconds < 60) {
+    return `${seconds} seconds`;
+  }
+
+  const minutes = Math.round(seconds / 60);
+  return `${minutes} minute${minutes === 1 ? "" : "s"}`;
+}
+
+async function getLatestBackupMetadata() {
+  const storedMetadata = getStoredBackupMetadata();
+  const folderMetadata = await getLatestBackupFileMetadata();
+  return getNewerBackupMetadata(storedMetadata, folderMetadata);
+}
+
+async function getLatestBackupFileMetadata() {
+  if (!backupDirectoryHandle || typeof backupDirectoryHandle.values !== "function") {
+    return null;
+  }
+
+  let latestMetadata = null;
+  const backupFilePattern = new RegExp(`^${BACKUP_FILE_PREFIX}-\\d{4}-\\d{2}-\\d{2}\\.json$`);
+  for await (const handle of backupDirectoryHandle.values()) {
+    if (handle.kind !== "file" || !backupFilePattern.test(handle.name)) {
+      continue;
+    }
+
+    try {
+      const file = await handle.getFile();
+      const metadata = {
+        savedAt: new Date(file.lastModified).toISOString(),
+        fileName: handle.name,
+        source: "folder",
+      };
+      latestMetadata = getNewerBackupMetadata(latestMetadata, metadata);
+    } catch (error) {
+      // Ignore unreadable files and keep looking for the newest readable backup.
+    }
+  }
+
+  return latestMetadata;
+}
+
+function storeBackupMetadata(savedAt, fileName, source) {
+  window.localStorage.setItem(BACKUP_META_KEY, JSON.stringify({
+    savedAt: savedAt.toISOString(),
+    fileName,
+    source,
+  }));
+}
+
+function getStoredBackupMetadata() {
+  const stored = window.localStorage.getItem(BACKUP_META_KEY);
+  if (!stored) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(stored);
+    const savedAt = new Date(parsed.savedAt);
+    if (Number.isNaN(savedAt.getTime()) || typeof parsed.fileName !== "string") {
+      return null;
+    }
+
+    return {
+      savedAt: savedAt.toISOString(),
+      fileName: parsed.fileName,
+      source: typeof parsed.source === "string" ? parsed.source : "",
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+function getNewerBackupMetadata(first, second) {
+  if (!first) {
+    return second || null;
+  }
+
+  if (!second) {
+    return first;
+  }
+
+  return new Date(first.savedAt).getTime() >= new Date(second.savedAt).getTime() ? first : second;
+}
+
+function formatBackupReadyStatus(metadata) {
+  if (!metadata) {
+    return `No backup saved yet. Auto-save every ${formatBackupInterval(getBackupAutoSaveMs())}.`;
+  }
+
+  return `Last backup: ${formatDateTime(metadata.savedAt)}`;
+}
+
+function formatBackupSavedStatus(savedAt) {
+  return `Last backup: ${formatDateTime(savedAt)}`;
+}
+
+function getBackupFileName(date = new Date()) {
+  return `${BACKUP_FILE_PREFIX}-${formatFileDate(date)}.json`;
+}
+
+function openBackupDatabase() {
+  return new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(BACKUP_DB_NAME, 1);
+    request.addEventListener("upgradeneeded", () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(BACKUP_STORE_NAME)) {
+        database.createObjectStore(BACKUP_STORE_NAME);
+      }
+    });
+    request.addEventListener("success", () => resolve(request.result));
+    request.addEventListener("error", () => reject(request.error));
+  });
+}
+
+async function storeBackupDirectoryHandle(directoryHandle) {
+  const database = await openBackupDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(BACKUP_STORE_NAME, "readwrite");
+    transaction.objectStore(BACKUP_STORE_NAME).put(directoryHandle, BACKUP_HANDLE_KEY);
+    transaction.addEventListener("complete", () => {
+      database.close();
+      resolve();
+    });
+    transaction.addEventListener("error", () => {
+      database.close();
+      reject(transaction.error);
+    });
+  });
+}
+
+async function getStoredBackupDirectoryHandle() {
+  const database = await openBackupDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(BACKUP_STORE_NAME, "readonly");
+    const request = transaction.objectStore(BACKUP_STORE_NAME).get(BACKUP_HANDLE_KEY);
+    request.addEventListener("success", () => resolve(request.result || null));
+    request.addEventListener("error", () => reject(request.error));
+    transaction.addEventListener("complete", () => database.close());
+    transaction.addEventListener("error", () => {
+      database.close();
+      reject(transaction.error);
+    });
+  });
+}
+
 function importDataFromFile(event) {
   const file = event.target.files?.[0];
   event.target.value = "";
@@ -604,9 +1028,11 @@ function applyImportedState(importedState) {
   closeDialog(elements.finishNoteDialog);
   closeDialog(elements.flaggedNotesDialog);
   closeDialog(elements.urgentTasksDialog);
+  closeDialog(elements.unfinishedTasksDialog);
   closeDialog(elements.goalNotesDialog);
   closeDialog(elements.reportDialog);
   closeDialog(elements.standupSummaryDialog);
+  closeDialog(elements.settingsDialog);
   render();
 }
 
@@ -736,7 +1162,8 @@ function render() {
     const goalNoteCount = getGoalNoteCount(tasks);
     const goalHasFlaggedNotes = tasks.some(taskHasFlaggedNotes);
     const unfinishedTaskCount = tasks.filter((task) => task.status !== "finished").length;
-    const finishedTaskCount = tasks.length - unfinishedTaskCount;
+    const focusTaskCount = tasks.filter(isTaskHighlightedInStandup).length;
+    const urgentTaskCount = tasks.filter((task) => task.urgent).length;
     const row = document.createElement("section");
     row.className = "task-row";
     row.dataset.rowIndex = String(rowIndex);
@@ -751,8 +1178,9 @@ function render() {
         <strong data-row-subtotal-index="${rowIndex}"></strong>
       </div>
       <div class="row-task-counts" aria-label="Activity task counts">
+        <span>${formatTaskCount(urgentTaskCount, "urgent")}</span>
+        <span>${formatTaskCount(focusTaskCount, "focus")}</span>
         <span>${formatTaskCount(unfinishedTaskCount, "unfinished")}</span>
-        <span>${formatTaskCount(finishedTaskCount, "finished")}</span>
       </div>
       <div class="row-label-actions">
         <button class="icon-button row-add-task-button" data-action="add-side-quest" data-row-index="${rowIndex}" type="button">Add task</button>
@@ -797,6 +1225,9 @@ function render() {
   }
   if (elements.urgentTasksDialog.open) {
     renderUrgentTasksModal();
+  }
+  if (elements.unfinishedTasksDialog.open) {
+    renderUnfinishedTasksModal();
   }
   if (elements.goalNotesDialog.open) {
     renderGoalNotesModal();
@@ -873,6 +1304,7 @@ function createTaskCard(task) {
   card.classList.toggle("is-finished", task.status === "finished");
   card.classList.toggle("is-unstarted", !getFirstStartedAt(task));
   card.classList.toggle("is-urgent", task.urgent);
+  card.classList.toggle("is-standup-highlighted", isTaskHighlightedInStandup(task));
   dragHandle.addEventListener("pointerdown", handleTaskPointerDown);
 
   bucket.value = task.bucket;
@@ -1074,6 +1506,13 @@ function renderFinishNoteModal() {
     flagButton.type = "button";
     flagButton.textContent = note.flagged ? "Unflag" : "Flag";
 
+    const convertButton = document.createElement("button");
+    convertButton.className = "button button-small button-secondary";
+    convertButton.dataset.action = "convert-finish-note-to-task";
+    convertButton.dataset.noteId = note.id;
+    convertButton.type = "button";
+    convertButton.textContent = "Convert to task";
+
     const deleteButton = document.createElement("button");
     deleteButton.className = "button button-small button-danger";
     deleteButton.dataset.action = "delete-finish-note";
@@ -1081,7 +1520,7 @@ function renderFinishNoteModal() {
     deleteButton.type = "button";
     deleteButton.textContent = "Delete";
 
-    actions.append(editButton, flagButton, deleteButton);
+    actions.append(editButton, flagButton, convertButton, deleteButton);
     item.append(details, actions);
     elements.finishNoteList.appendChild(item);
   });
@@ -1232,6 +1671,11 @@ function openUrgentTasksDialog() {
   openDialog(elements.urgentTasksDialog);
 }
 
+function openUnfinishedTasksDialog() {
+  renderUnfinishedTasksModal();
+  openDialog(elements.unfinishedTasksDialog);
+}
+
 function renderFlaggedNotesModal() {
   const flaggedNotes = getFlaggedNotes();
   elements.flaggedNotesList.innerHTML = "";
@@ -1330,6 +1774,162 @@ function renderUrgentTasksModal() {
   });
 }
 
+function renderUnfinishedTasksModal() {
+  const unfinishedTasks = getUnfinishedTasks();
+  elements.unfinishedTasksList.innerHTML = "";
+
+  if (unfinishedTasks.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty-log";
+    empty.textContent = "No unfinished tasks.";
+    elements.unfinishedTasksList.appendChild(empty);
+    return;
+  }
+
+  let currentRow = null;
+  let currentGroup = null;
+  let currentGroupTasks = null;
+  const tasksByRow = getUnfinishedTasksByRow(unfinishedTasks);
+  unfinishedTasks.forEach((task) => {
+    if (task.row !== currentRow) {
+      currentRow = task.row;
+      currentGroup = document.createElement("details");
+      currentGroup.className = "unfinished-activity-group";
+      currentGroup.open = true;
+
+      const heading = document.createElement("summary");
+      heading.className = "unfinished-activity-heading";
+      heading.append(
+        createUnfinishedActivityHeadingText(task.row),
+        createUnfinishedActivityBadges(tasksByRow.get(task.row) || [])
+      );
+
+      currentGroupTasks = document.createElement("div");
+      currentGroupTasks.className = "unfinished-activity-tasks";
+
+      currentGroup.append(heading, currentGroupTasks);
+      elements.unfinishedTasksList.appendChild(currentGroup);
+    }
+
+    currentGroupTasks.appendChild(createUnfinishedTaskItem(task));
+  });
+}
+
+function getUnfinishedTasksByRow(tasks) {
+  return tasks.reduce((groups, task) => {
+    if (!groups.has(task.row)) {
+      groups.set(task.row, []);
+    }
+    groups.get(task.row).push(task);
+    return groups;
+  }, new Map());
+}
+
+function createUnfinishedActivityHeadingText(rowIndex) {
+  const text = document.createElement("span");
+  text.className = "unfinished-activity-title";
+  text.textContent = getRowName(rowIndex);
+  return text;
+}
+
+function createUnfinishedActivityBadges(tasks) {
+  const badges = document.createElement("span");
+  badges.className = "unfinished-task-badges unfinished-activity-badges";
+  const counts = getUnfinishedActivityBadgeCounts(tasks);
+
+  if (counts.active > 0) {
+    badges.appendChild(createUnfinishedTaskBadge(formatTaskCount(counts.active, "active"), "is-active"));
+  }
+  if (counts.urgent > 0) {
+    badges.appendChild(createUnfinishedTaskBadge(formatTaskCount(counts.urgent, "urgent"), "is-urgent"));
+  }
+  if (counts.focus > 0) {
+    badges.appendChild(createUnfinishedTaskBadge(formatTaskCount(counts.focus, "focus"), "is-focus"));
+  }
+  if (counts.flagged > 0) {
+    badges.appendChild(createUnfinishedTaskBadge(`${counts.flagged} flagged note${counts.flagged === 1 ? "" : "s"}`, "has-flagged-note"));
+  }
+
+  return badges;
+}
+
+function getUnfinishedActivityBadgeCounts(tasks) {
+  return tasks.reduce((counts, task) => {
+    counts.active += isTaskRunning(task) ? 1 : 0;
+    counts.urgent += task.urgent ? 1 : 0;
+    counts.focus += isTaskHighlightedInStandup(task) ? 1 : 0;
+    counts.flagged += taskHasFlaggedNotes(task) ? 1 : 0;
+    return counts;
+  }, {
+    active: 0,
+    urgent: 0,
+    focus: 0,
+    flagged: 0,
+  });
+}
+
+function createUnfinishedTaskItem(task) {
+  const item = document.createElement("div");
+  item.className = "log-item unfinished-task-item";
+  item.classList.toggle("is-active", isTaskRunning(task));
+  item.dataset.taskId = task.id;
+
+  const openButton = document.createElement("button");
+  openButton.className = "unfinished-task-open";
+  openButton.dataset.action = "open-unfinished-task";
+  openButton.dataset.taskId = task.id;
+  openButton.type = "button";
+
+  const text = document.createElement("span");
+  text.className = "unfinished-task-text";
+  text.textContent = task.objective;
+
+  openButton.appendChild(text);
+
+  const badges = document.createElement("span");
+  badges.className = "unfinished-task-badges";
+  if (task.urgent) {
+    badges.appendChild(createUnfinishedTaskBadge("urgent", "is-urgent"));
+  }
+  if (isTaskHighlightedInStandup(task)) {
+    badges.appendChild(createUnfinishedTaskBadge("focus", "is-focus"));
+  }
+  if (taskHasFlaggedNotes(task)) {
+    badges.appendChild(createUnfinishedTaskBadge("flagged notes", "has-flagged-note"));
+  }
+  if (badges.childElementCount > 0) {
+    openButton.appendChild(badges);
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "log-actions";
+
+  const startButton = document.createElement("button");
+  startButton.className = "button button-small button-start";
+  startButton.dataset.action = "toggle-timer";
+  startButton.type = "button";
+  startButton.textContent = isTaskRunning(task) ? "Pause" : "Start";
+
+  actions.appendChild(startButton);
+  item.append(openButton, actions);
+  return item;
+}
+
+function createUnfinishedTaskBadge(label, modifier = "") {
+  const badge = document.createElement("span");
+  badge.className = `unfinished-task-badge${modifier ? ` ${modifier}` : ""}`;
+  badge.textContent = label;
+  return badge;
+}
+
+function setUnfinishedTaskGroupsOpen(isOpen) {
+  elements.unfinishedTasksList
+    .querySelectorAll(".unfinished-activity-group")
+    .forEach((group) => {
+      group.open = isOpen;
+    });
+}
+
 function getFlaggedNotes() {
   return getSortedTasks()
     .flatMap((task) => task.finishNotes
@@ -1344,6 +1944,10 @@ function getFlaggedNotes() {
 
 function getUrgentTasks() {
   return getSortedTasks().filter((task) => task.urgent);
+}
+
+function getUnfinishedTasks() {
+  return getSortedTasks().filter((task) => task.status !== "finished");
 }
 
 function openFlaggedNote(taskId, noteId) {
@@ -1366,6 +1970,16 @@ function openUrgentTask(taskId) {
   }
 
   closeDialog(elements.urgentTasksDialog);
+  scrollToTask(taskId);
+}
+
+function openUnfinishedTask(taskId) {
+  const task = findTask(taskId);
+  if (!task) {
+    return;
+  }
+
+  closeDialog(elements.unfinishedTasksDialog);
   scrollToTask(taskId);
 }
 
@@ -2327,6 +2941,43 @@ function refreshTimeLogViews(taskId) {
   render();
 }
 
+function convertFinishNoteToTask(taskId, noteId) {
+  const sourceTask = findTask(taskId);
+  const note = sourceTask?.finishNotes.find((candidate) => candidate.id === noteId);
+  if (!sourceTask || !note) {
+    return;
+  }
+
+  const objective = createTaskObjectiveFromNote(note.text);
+  const convertedTask = createTask({
+    objective,
+    bucket: sourceTask.bucket,
+    placement: "side",
+    rowIndex: sourceTask.row,
+  });
+  state.tasks.push(convertedTask);
+  sourceTask.finishNotes = sourceTask.finishNotes.filter((candidate) => candidate.id !== noteId);
+  normalizeBoard();
+  saveState();
+  if (activeFinishNoteTaskId === taskId) {
+    resetFinishNoteForm();
+    renderFinishNoteModal();
+  }
+  if (elements.flaggedNotesDialog.open) {
+    renderFlaggedNotesModal();
+  }
+  if (elements.goalNotesDialog.open) {
+    renderGoalNotesModal();
+  }
+  updateFlaggedNotesButton();
+  render();
+}
+
+function createTaskObjectiveFromNote(noteText) {
+  const objective = String(noteText || "").trim().replace(/\s+/g, " ");
+  return (objective || "Follow up from note").slice(0, 180);
+}
+
 function deleteFinishNote(taskId, noteId) {
   const task = findTask(taskId);
   if (!task) {
@@ -2488,14 +3139,19 @@ function resetStateWithPrompt() {
   activeFinishNoteTaskId = null;
   activeGoalNotesRowId = null;
   window.localStorage.removeItem(STORAGE_KEY);
+  window.localStorage.removeItem(STANDUP_SETTINGS_KEY);
+  standupLastDate = getDefaultLastStandupDate();
+  standupHighlightedKeys = new Set();
   closeDialog(elements.timeLogDialog);
   closeDialog(elements.logDialog);
   closeDialog(elements.finishNoteDialog);
   closeDialog(elements.flaggedNotesDialog);
   closeDialog(elements.urgentTasksDialog);
+  closeDialog(elements.unfinishedTasksDialog);
   closeDialog(elements.goalNotesDialog);
   closeDialog(elements.reportDialog);
   closeDialog(elements.standupSummaryDialog);
+  closeDialog(elements.settingsDialog);
   render();
 }
 
@@ -2522,40 +3178,85 @@ function openStandupSummaryDialog() {
     return;
   }
 
+  syncLastStandupDateInput();
   renderStandupSummaryPreview();
-  setStandupSummaryCopyStatus("");
   openDialog(elements.standupSummaryDialog);
+}
+
+function loadStandupSettings() {
+  const stored = window.localStorage.getItem(STANDUP_SETTINGS_KEY);
+  if (!stored) {
+    standupLastDate = getDefaultLastStandupDate();
+    standupHighlightedKeys = new Set();
+    return;
+  }
+
+  try {
+    const settings = JSON.parse(stored);
+    standupLastDate = sanitizeStandupDate(settings.lastStandupDate) || getDefaultLastStandupDate();
+    standupHighlightedKeys = new Set(
+      Array.isArray(settings.highlightedKeys)
+        ? settings.highlightedKeys.filter((key) => typeof key === "string" && key)
+        : []
+    );
+  } catch (error) {
+    standupLastDate = getDefaultLastStandupDate();
+    standupHighlightedKeys = new Set();
+  }
+}
+
+function saveStandupSettings() {
+  window.localStorage.setItem(STANDUP_SETTINGS_KEY, JSON.stringify({
+    lastStandupDate: getLastStandupDateValue(),
+    highlightedKeys: [...standupHighlightedKeys],
+  }));
+}
+
+function syncLastStandupDateInput() {
+  if (!elements.lastStandupDateInput) {
+    return;
+  }
+
+  elements.lastStandupDateInput.value = getLastStandupDateValue();
+  elements.lastStandupDateInput.max = formatFileDate(new Date());
+}
+
+function saveLastStandupDateFromInput() {
+  const selectedDate = sanitizeStandupDate(elements.lastStandupDateInput.value) || getDefaultLastStandupDate();
+  standupLastDate = selectedDate;
+  elements.lastStandupDateInput.value = selectedDate;
+  saveStandupSettings();
+  renderStandupSummaryPreview();
 }
 
 function renderStandupSummaryPreview() {
   const summary = buildStandupSummary();
   elements.standupSummaryPreview.innerHTML = "";
 
-  const heading = document.createElement("h3");
-  heading.textContent = "Standup Summary";
-
-  elements.standupSummaryPreview.appendChild(heading);
-  appendStandupPreviewSection(
+  appendStandupGroupedPreviewSection(
     elements.standupSummaryPreview,
-    "What I did yesterday",
-    summary.completedYesterday,
-    formatStandupCompletedTask
+    "What I did since last standup",
+    summary.sinceLastStandupTasks,
+    formatStandupGroupedCompletedTask,
+    "since"
   );
   appendStandupPreviewSection(
     elements.standupSummaryPreview,
     "What I'm doing today",
     summary.todayTasks,
-    formatStandupTodayTask
+    formatStandupTodayTask,
+    "today"
   );
   appendStandupPreviewSection(
     elements.standupSummaryPreview,
     "What I'm stuck on",
     summary.blockers,
-    formatStandupBlocker
+    formatStandupBlocker,
+    "blocker"
   );
 }
 
-function appendStandupPreviewSection(parent, title, items, formatter) {
+function appendStandupPreviewSection(parent, title, items, formatter, sectionKey) {
   const heading = document.createElement("h4");
   heading.textContent = title;
 
@@ -2566,16 +3267,155 @@ function appendStandupPreviewSection(parent, title, items, formatter) {
     list.appendChild(emptyItem);
   } else {
     items.forEach((item) => {
-      const listItem = document.createElement("li");
-      listItem.textContent = formatter(item);
-      list.appendChild(listItem);
+      list.appendChild(createStandupSummaryItem(item, formatter, sectionKey));
     });
   }
 
   parent.append(heading, list);
 }
 
+function appendStandupGroupedPreviewSection(parent, title, items, formatter, sectionKey) {
+  const heading = document.createElement("h4");
+  heading.textContent = title;
+  parent.appendChild(heading);
+
+  if (items.length === 0) {
+    const list = document.createElement("ul");
+    const emptyItem = document.createElement("li");
+    emptyItem.textContent = "None";
+    list.appendChild(emptyItem);
+    parent.appendChild(list);
+    return;
+  }
+
+  getStandupProjectGroups(items).forEach((group) => {
+    const project = document.createElement("section");
+    project.className = "standup-project-group";
+
+    const projectHeading = document.createElement("h5");
+    projectHeading.textContent = group.label;
+
+    const list = document.createElement("ul");
+    group.items.forEach((item) => {
+      list.appendChild(createStandupSummaryItem(item, formatter, sectionKey));
+    });
+
+    project.append(projectHeading, list);
+    parent.appendChild(project);
+  });
+}
+
+function getStandupProjectGroups(items) {
+  const groups = new Map();
+
+  items.forEach((item) => {
+    const label = item.activity || "No activity";
+    if (!groups.has(label)) {
+      groups.set(label, {
+        label,
+        row: Number.isInteger(item.row) ? item.row : Number.MAX_SAFE_INTEGER,
+        items: [],
+      });
+    }
+
+    const group = groups.get(label);
+    group.row = Math.min(group.row, Number.isInteger(item.row) ? item.row : Number.MAX_SAFE_INTEGER);
+    group.items.push(item);
+  });
+
+  return [...groups.values()]
+    .sort((a, b) => a.row - b.row || a.label.localeCompare(b.label))
+    .map((group) => ({
+      ...group,
+      items: group.items.sort((a, b) => a.sortTime - b.sortTime || a.order - b.order),
+    }));
+}
+
+function createStandupSummaryItem(item, formatter, sectionKey) {
+  const itemKey = getStandupSummaryItemKey(sectionKey, item);
+  const listItem = document.createElement("li");
+  listItem.className = "standup-summary-item";
+  listItem.classList.toggle("is-highlighted", standupHighlightedKeys.has(itemKey));
+  listItem.dataset.standupKey = itemKey;
+  listItem.tabIndex = 0;
+  listItem.setAttribute("role", "button");
+  listItem.setAttribute("aria-pressed", String(standupHighlightedKeys.has(itemKey)));
+  listItem.textContent = formatter(item);
+  listItem.addEventListener("click", () => {
+    toggleStandupSummaryItemHighlight(listItem);
+  });
+  listItem.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+
+    event.preventDefault();
+    toggleStandupSummaryItemHighlight(listItem);
+  });
+  return listItem;
+}
+
+function getStandupSummaryItemKey(sectionKey, item) {
+  return `${sectionKey}:${item.id || item.objective || item.note || "item"}`;
+}
+
+function toggleStandupSummaryItemHighlight(item) {
+  const key = item.dataset.standupKey;
+  const isHighlighted = item.classList.toggle("is-highlighted");
+  item.setAttribute("aria-pressed", String(isHighlighted));
+  if (!key) {
+    return;
+  }
+
+  if (isHighlighted) {
+    standupHighlightedKeys.add(key);
+  } else {
+    standupHighlightedKeys.delete(key);
+  }
+  saveStandupSettings();
+  syncTaskStandupHighlightFromKey(key);
+}
+
+function syncTaskStandupHighlightFromKey(key) {
+  const taskId = getTaskIdFromStandupHighlightKey(key);
+  const task = findTask(taskId);
+  if (!task) {
+    return;
+  }
+
+  document.querySelectorAll(".task-card").forEach((card) => {
+    if (card.dataset.taskId === taskId) {
+      card.classList.toggle("is-standup-highlighted", isTaskHighlightedInStandup(task));
+    }
+  });
+}
+
+function getTaskIdFromStandupHighlightKey(key) {
+  if (typeof key !== "string") {
+    return "";
+  }
+
+  const [section, taskId] = key.split(":");
+  return section === "since" || section === "today" || section === "blocker" ? taskId || "" : "";
+}
+
+function isTaskHighlightedInStandup(task) {
+  if (!task?.id) {
+    return false;
+  }
+
+  return [...standupHighlightedKeys].some((key) => isStandupHighlightKeyForTask(key, task.id));
+}
+
+function isStandupHighlightKeyForTask(key, taskId) {
+  return key === `since:${taskId}`
+    || key === `today:${taskId}`
+    || key.startsWith(`blocker:${taskId}:`);
+}
+
 function buildStandupSummary() {
+  const rangeStart = getStandupRangeStart();
+  const rangeEnd = new Date();
   const unfinishedTasks = getSortedTasks().filter((task) => !isTaskFinishedForReport(task));
   const urgentTasks = unfinishedTasks
     .filter((task) => task.urgent)
@@ -2585,9 +3425,10 @@ function buildStandupSummary() {
     .map(createStandupTaskEntry);
 
   return {
-    completedYesterday: getCompletedTasksForYesterday().map(createStandupTaskEntry),
+    sinceLastStandupTasks: getStandupTasksSince(rangeStart, rangeEnd),
     todayTasks: [...urgentTasks, ...prioritizedTasks],
-    blockers: getFlaggedNotes().map(({ task, note }) => ({
+    blockers: getStandupNotes().map(({ task, note }) => ({
+      id: `${task.id}:${note.id}`,
       activity: getRowName(task.row),
       objective: task.objective,
       note: note.text,
@@ -2595,25 +3436,68 @@ function buildStandupSummary() {
   };
 }
 
-function getCompletedTasksForYesterday() {
-  const todayStart = startOfToday();
-  const yesterdayStart = new Date(todayStart);
-  yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-
+function getStandupNotes() {
   return getSortedTasks()
-    .filter((task) => task.finishedAt
-      && isTaskFinishedForReport(task)
-      && isDateInRange(task.finishedAt, yesterdayStart, todayStart))
-    .sort((a, b) => new Date(a.finishedAt).getTime() - new Date(b.finishedAt).getTime());
+    .flatMap((task) => task.finishNotes.map((note) => ({ task, note })))
+    .sort((a, b) => (
+      a.task.row - b.task.row
+      || a.task.order - b.task.order
+      || new Date(a.note.createdAt).getTime() - new Date(b.note.createdAt).getTime()
+    ));
 }
 
-function isDateInRange(value, start, end) {
-  const date = new Date(value);
-  return !Number.isNaN(date.getTime()) && date >= start && date < end;
+function getStandupTasksSince(rangeStart, rangeEnd) {
+  return getSortedTasks()
+    .map((task) => createStandupRangeTaskEntry(task, rangeStart, rangeEnd))
+    .filter((entry) => entry.durationMs > 0)
+    .sort((a, b) => a.sortTime - b.sortTime || a.row - b.row || a.order - b.order);
+}
+
+function createStandupRangeTaskEntry(task, rangeStart, rangeEnd) {
+  const logEntries = task.logs
+    .map((log) => ({
+      durationMs: getStandupLogDurationWithinRange(log, rangeStart, rangeEnd),
+      sortTime: getStandupLogSortTime(log, rangeStart),
+    }))
+    .filter((entry) => entry.durationMs > 0);
+
+  const durationMs = logEntries.reduce((total, entry) => total + entry.durationMs, 0);
+  const firstLogTime = logEntries.reduce((earliest, entry) => Math.min(earliest, entry.sortTime), Number.POSITIVE_INFINITY);
+
+  return {
+    ...createStandupTaskEntry(task),
+    durationMs,
+    isFinished: isTaskFinishedForReport(task),
+    sortTime: firstLogTime,
+  };
+}
+
+function getStandupLogDurationWithinRange(log, rangeStart, rangeEnd) {
+  if (log.manual) {
+    const createdAt = new Date(log.createdAt || Date.now());
+    return createdAt >= rangeStart && createdAt < rangeEnd ? log.durationMs : 0;
+  }
+
+  return getLogDurationWithinRange(log, rangeStart, rangeEnd);
+}
+
+function getStandupLogSortTime(log, rangeStart) {
+  if (log.manual) {
+    return new Date(log.createdAt || rangeStart).getTime();
+  }
+
+  if (!log.start) {
+    return rangeStart.getTime();
+  }
+
+  return Math.max(new Date(log.start).getTime(), rangeStart.getTime());
 }
 
 function createStandupTaskEntry(task) {
   return {
+    id: task.id,
+    row: task.row,
+    order: task.order,
     objective: task.objective,
     activity: getRowName(task.row),
     bucket: task.bucket,
@@ -2622,76 +3506,61 @@ function createStandupTaskEntry(task) {
   };
 }
 
-function formatStandupCompletedTask(entry) {
-  return `${entry.objective} (${entry.activity} / ${entry.bucket}) - ${formatDuration(entry.durationMs)}`;
+function formatStandupGroupedCompletedTask(entry) {
+  return `${entry.objective} - ${formatDuration(entry.durationMs)}${entry.isFinished ? " - Finished" : ""}`;
 }
 
 function formatStandupTodayTask(entry) {
-  return `${entry.urgent ? "[Urgent] " : ""}${entry.objective} (${entry.activity} / ${entry.bucket})`;
+  return `${entry.urgent ? "[Urgent] " : ""}${entry.objective} (${entry.activity})`;
 }
 
 function formatStandupBlocker(entry) {
   return `${entry.activity} / ${entry.objective}: ${entry.note}`;
 }
 
-function buildStandupSummaryText(summary = buildStandupSummary()) {
-  const lines = ["# Standup Summary"];
-  appendStandupTextSection(lines, "What I did yesterday", summary.completedYesterday, formatStandupCompletedTask);
-  appendStandupTextSection(lines, "What I'm doing today", summary.todayTasks, formatStandupTodayTask);
-  appendStandupTextSection(lines, "What I'm stuck on", summary.blockers, formatStandupBlocker);
-  return `${lines.join("\n")}\n`;
+function getStandupRangeStart() {
+  return parseStandupDate(getLastStandupDateValue()) || startOfToday();
 }
 
-function appendStandupTextSection(lines, title, items, formatter) {
-  lines.push("", `## ${title}`);
-  if (items.length === 0) {
-    lines.push("- None");
-    return;
-  }
-
-  items.forEach((item) => {
-    lines.push(`- ${formatter(item)}`);
-  });
+function getLastStandupDateValue() {
+  return sanitizeStandupDate(standupLastDate) || getDefaultLastStandupDate();
 }
 
-async function copyStandupSummaryFromDialog() {
-  if (!elements.copyStandupSummaryButton) {
-    return;
-  }
-
-  const summaryText = buildStandupSummaryText();
-  const originalText = elements.copyStandupSummaryButton.textContent;
-  elements.copyStandupSummaryButton.textContent = "Copying";
-  elements.copyStandupSummaryButton.disabled = true;
-  setStandupSummaryCopyStatus("");
-
-  try {
-    await copyTextToClipboard(summaryText);
-    elements.copyStandupSummaryButton.textContent = "Copied";
-    setStandupSummaryCopyStatus("Copied to clipboard.");
-  } catch (error) {
-    elements.copyStandupSummaryButton.textContent = "Copy failed";
-    setStandupSummaryCopyStatus("Copy failed.");
-  }
-
-  window.setTimeout(() => {
-    if (!elements.copyStandupSummaryButton.isConnected) {
-      return;
-    }
-
-    elements.copyStandupSummaryButton.textContent = originalText;
-    elements.copyStandupSummaryButton.disabled = false;
-    setStandupSummaryCopyStatus("");
-  }, 1800);
+function getDefaultLastStandupDate() {
+  const date = startOfToday();
+  date.setDate(date.getDate() - 1);
+  return formatFileDate(date);
 }
 
-function setStandupSummaryCopyStatus(message) {
-  if (!elements.standupSummaryCopyStatus) {
-    return;
+function sanitizeStandupDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return "";
   }
 
-  elements.standupSummaryCopyStatus.textContent = message;
-  elements.standupSummaryCopyStatus.hidden = !message;
+  return parseStandupDate(value) ? value : "";
+}
+
+function parseStandupDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    return null;
+  }
+
+  const [, year, month, day] = match;
+  const yearNumber = Number(year);
+  const monthNumber = Number(month);
+  const dayNumber = Number(day);
+  const date = new Date(yearNumber, monthNumber - 1, dayNumber, 0, 0, 0, 0);
+  if (
+    Number.isNaN(date.getTime())
+    || date.getFullYear() !== yearNumber
+    || date.getMonth() !== monthNumber - 1
+    || date.getDate() !== dayNumber
+  ) {
+    return null;
+  }
+
+  return date;
 }
 
 function openReportDialog() {
@@ -3210,6 +4079,7 @@ function createReportLogEntry(log, task, reportStart, reportEnd) {
   return {
     durationMs,
     objective: task.objective,
+    activity: getRowName(task.row),
     bucket: task.bucket,
     wasUrgent: wasTaskEverUrgent(task),
     isFinished: isTaskFinishedForReport(task),
@@ -3322,8 +4192,8 @@ function formatTimelineEntry(entry) {
   const timeRange = entry.start
     ? `${formatDateTime(entry.start)} - ${entry.end ? formatDateTime(entry.end) : "Running"}`
     : entry.label;
-  const duration = entry.start ? ` (${formatDuration(entry.durationMs)})` : "";
-  return `${timeRange}${duration} | ${entry.objective}${formatUrgentReportLabel(entry)} | ${entry.bucket}`;
+  const activity = `${entry.activity || "Activity"} (${formatDuration(entry.durationMs)})`;
+  return `${timeRange} | ${activity} | ${entry.objective}${formatUrgentReportLabel(entry)}`;
 }
 
 function getTimelineEntryDayKey(entry) {
@@ -3450,16 +4320,26 @@ function updateUrgentIndicator() {
 }
 
 function updateStickyCountPills() {
-  const goalCount = state.rows.length;
-  const unfinishedTaskCount = state.tasks.filter((task) => task.status !== "finished").length;
-  elements.goalCountPill.textContent = `${goalCount} total activit${goalCount === 1 ? "y" : "ies"}`;
-  elements.unfinishedTaskCountPill.textContent = `${unfinishedTaskCount} unfinished task${unfinishedTaskCount === 1 ? "" : "s"}`;
+  const unfinishedTaskCount = getUnfinishedTasks().length;
+  const label = `${unfinishedTaskCount} unfinished task${unfinishedTaskCount === 1 ? "" : "s"}`;
+  elements.unfinishedTaskCountPill.textContent = label;
+  elements.unfinishedTaskCountPill.setAttribute("aria-label", `${label}. Open unfinished tasks quick view.`);
 }
 
 function updateFlaggedNotesButton() {
   const flaggedCount = getFlaggedNotes().length;
-  elements.flaggedNotesButton.textContent = `Flagged Notes (${flaggedCount})`;
-  elements.flaggedNotesButton.classList.toggle("has-flagged-notes", flaggedCount > 0);
+  const count = document.createElement("span");
+  count.textContent = String(flaggedCount);
+
+  const label = document.createElement("span");
+  label.textContent = `flagged note${flaggedCount === 1 ? "" : "s"}`;
+
+  const flag = document.createElement("span");
+  flag.className = "urgent-flag flagged-notes-icon";
+  flag.setAttribute("aria-hidden", "true");
+
+  elements.flaggedNotesButton.replaceChildren(flag, count, label);
+  elements.flaggedNotesButton.setAttribute("aria-label", `${flaggedCount} flagged note${flaggedCount === 1 ? "" : "s"}. Open flagged notes.`);
 }
 
 function renderGoalTotals(goals) {
