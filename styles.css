@@ -1378,20 +1378,17 @@ body.is-board-dragging * {
   box-shadow: 0 4px 0 #fbfbf8;
 }
 
-#standupSummaryPreview h4.standup-heading-since,
-.standup-project-group h5.standup-heading-since {
+#standupSummaryPreview h4.standup-heading-since {
   background: var(--bucket-admin);
   box-shadow: 0 4px 0 var(--bucket-admin);
 }
 
-#standupSummaryPreview h4.standup-heading-today,
-.standup-project-group h5.standup-heading-today {
+#standupSummaryPreview h4.standup-heading-today {
   background: var(--yellow);
   box-shadow: 0 4px 0 var(--yellow);
 }
 
-#standupSummaryPreview h4.standup-heading-blocker,
-.standup-project-group h5.standup-heading-blocker {
+#standupSummaryPreview h4.standup-heading-blocker {
   background: var(--pink);
   box-shadow: 0 4px 0 var(--pink);
 }
@@ -1413,18 +1410,6 @@ body.is-board-dragging * {
   font-weight: 900;
   padding: 4px 14px 5px 30px;
   box-shadow: 0 4px 0 #fbfbf8;
-}
-
-.standup-project-group h5.standup-heading-since {
-  border-left: 4px solid var(--bucket-admin-line);
-}
-
-.standup-project-group h5.standup-heading-today {
-  border-left: 4px solid #d1b84c;
-}
-
-.standup-project-group h5.standup-heading-blocker {
-  border-left: 4px solid var(--pink-line);
 }
 
 .standup-project-group ul {
