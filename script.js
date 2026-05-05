@@ -106,6 +106,8 @@ function cacheElements() {
   elements.goalTotals = document.getElementById("goalTotals");
   elements.urgentIndicator = document.getElementById("urgentIndicator");
   elements.urgentIndicatorText = document.getElementById("urgentIndicatorText");
+  elements.focusIndicator = document.getElementById("focusIndicator");
+  elements.focusIndicatorText = document.getElementById("focusIndicatorText");
   elements.unfinishedTaskCountPill = document.getElementById("unfinishedTaskCountPill");
   elements.generateReportButton = document.getElementById("generateReportButton");
   elements.exportDataButton = document.getElementById("exportDataButton");
@@ -173,6 +175,8 @@ function cacheElements() {
   elements.flaggedNotesList = document.getElementById("flaggedNotesList");
   elements.urgentTasksDialog = document.getElementById("urgentTasksDialog");
   elements.urgentTasksList = document.getElementById("urgentTasksList");
+  elements.focusTasksDialog = document.getElementById("focusTasksDialog");
+  elements.focusTasksList = document.getElementById("focusTasksList");
   elements.unfinishedTasksDialog = document.getElementById("unfinishedTasksDialog");
   elements.unfinishedTasksList = document.getElementById("unfinishedTasksList");
   elements.unfinishedTasksSearchInput = document.getElementById("unfinishedTasksSearchInput");
@@ -226,6 +230,7 @@ function bindEvents() {
   elements.lastStandupDateInput?.addEventListener("change", saveLastStandupDateFromInput);
   elements.flaggedNotesButton.addEventListener("click", openFlaggedNotesDialog);
   elements.urgentIndicator.addEventListener("click", openUrgentTasksDialog);
+  elements.focusIndicator?.addEventListener("click", openFocusTasksDialog);
   elements.unfinishedTaskCountPill.addEventListener("click", openUnfinishedTasksDialog);
   elements.unfinishedTasksSearchInput.addEventListener("input", renderUnfinishedTasksModal);
   elements.scrollTopButton.addEventListener("click", scrollToTop);
@@ -291,6 +296,11 @@ function handleDocumentClick(event) {
 
   if (action === "close-urgent-tasks-dialog") {
     closeDialog(elements.urgentTasksDialog);
+    return;
+  }
+
+  if (action === "close-focus-tasks-dialog") {
+    closeDialog(elements.focusTasksDialog);
     return;
   }
 
@@ -388,6 +398,11 @@ function handleDocumentClick(event) {
 
   if (action === "open-urgent-task") {
     openUrgentTask(actionElement.dataset.taskId);
+    return;
+  }
+
+  if (action === "open-focus-task") {
+    openFocusTask(actionElement.dataset.taskId);
     return;
   }
 
@@ -1042,6 +1057,7 @@ function applyImportedState(importedState) {
   closeDialog(elements.finishNoteDialog);
   closeDialog(elements.flaggedNotesDialog);
   closeDialog(elements.urgentTasksDialog);
+  closeDialog(elements.focusTasksDialog);
   closeDialog(elements.unfinishedTasksDialog);
   closeDialog(elements.goalNotesDialog);
   closeDialog(elements.reportDialog);
@@ -1234,6 +1250,7 @@ function render() {
 
   elements.board.appendChild(createAddTaskFooter(rows.length === 0));
   updateUrgentIndicator();
+  updateFocusIndicator();
   updateStickyCountPills();
   updateFlaggedNotesButton();
   if (elements.flaggedNotesDialog.open) {
@@ -1241,6 +1258,9 @@ function render() {
   }
   if (elements.urgentTasksDialog.open) {
     renderUrgentTasksModal();
+  }
+  if (elements.focusTasksDialog?.open) {
+    renderFocusTasksModal();
   }
   if (elements.unfinishedTasksDialog.open) {
     renderUnfinishedTasksModal();
@@ -1784,6 +1804,15 @@ function openUrgentTasksDialog() {
   openDialog(elements.urgentTasksDialog);
 }
 
+function openFocusTasksDialog() {
+  if (!elements.focusTasksDialog || !elements.focusTasksList) {
+    return;
+  }
+
+  renderFocusTasksModal();
+  openDialog(elements.focusTasksDialog);
+}
+
 function openUnfinishedTasksDialog() {
   elements.unfinishedTasksSearchInput.value = "";
   renderUnfinishedTasksModal();
@@ -1838,6 +1867,58 @@ function renderFlaggedNotesModal() {
     actions.appendChild(unflagButton);
     item.append(openButton, actions);
     elements.flaggedNotesList.appendChild(item);
+  });
+}
+
+function renderFocusTasksModal() {
+  if (!elements.focusTasksList) {
+    return;
+  }
+
+  const focusTasks = getFocusTasks();
+  elements.focusTasksList.innerHTML = "";
+
+  if (focusTasks.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty-log";
+    empty.textContent = "No focus tasks.";
+    elements.focusTasksList.appendChild(empty);
+    return;
+  }
+
+  focusTasks.forEach((task) => {
+    const item = document.createElement("div");
+    item.className = "log-item focus-task-item";
+    item.dataset.taskId = task.id;
+
+    const openButton = document.createElement("button");
+    openButton.className = "focus-task-open";
+    openButton.dataset.action = "open-focus-task";
+    openButton.dataset.taskId = task.id;
+    openButton.type = "button";
+
+    const context = document.createElement("span");
+    context.className = "focus-task-context";
+    context.textContent = `${getRowName(task.row)} / ${task.bucket} / ${formatDuration(getTaskElapsed(task))}`;
+
+    const text = document.createElement("span");
+    text.className = "focus-task-text";
+    text.textContent = task.objective;
+
+    openButton.append(context, text);
+
+    const actions = document.createElement("div");
+    actions.className = "log-actions";
+
+    const startButton = document.createElement("button");
+    startButton.className = "button button-small button-start";
+    startButton.dataset.action = "toggle-timer";
+    startButton.type = "button";
+    startButton.textContent = isTaskRunning(task) ? "Pause" : "Start";
+
+    actions.appendChild(startButton);
+    item.append(openButton, actions);
+    elements.focusTasksList.appendChild(item);
   });
 }
 
@@ -2129,6 +2210,10 @@ function getUrgentTasks() {
   return getSortedTasks().filter((task) => task.urgent);
 }
 
+function getFocusTasks() {
+  return getSortedTasks().filter(isTaskHighlightedInStandup);
+}
+
 function getUnfinishedTasks() {
   return getSortedTasks().filter((task) => task.status !== "finished");
 }
@@ -2153,6 +2238,16 @@ function openUrgentTask(taskId) {
   }
 
   closeDialog(elements.urgentTasksDialog);
+  scrollToTask(taskId);
+}
+
+function openFocusTask(taskId) {
+  const task = findTask(taskId);
+  if (!task) {
+    return;
+  }
+
+  closeDialog(elements.focusTasksDialog);
   scrollToTask(taskId);
 }
 
@@ -3522,6 +3617,7 @@ function resetStateWithPrompt() {
   closeDialog(elements.finishNoteDialog);
   closeDialog(elements.flaggedNotesDialog);
   closeDialog(elements.urgentTasksDialog);
+  closeDialog(elements.focusTasksDialog);
   closeDialog(elements.unfinishedTasksDialog);
   closeDialog(elements.goalNotesDialog);
   closeDialog(elements.reportDialog);
@@ -4992,6 +5088,18 @@ function updateUrgentIndicator() {
   const label = urgentCount === 1 ? "1 urgent task" : `${urgentCount} urgent tasks`;
   elements.urgentIndicatorText.textContent = label;
   elements.urgentIndicator.setAttribute("aria-label", `${label}. Open urgent tasks.`);
+}
+
+function updateFocusIndicator() {
+  if (!elements.focusIndicator || !elements.focusIndicatorText) {
+    return;
+  }
+
+  const focusCount = getFocusTasks().length;
+  elements.focusIndicator.hidden = focusCount === 0;
+  const label = focusCount === 1 ? "1 focus task" : `${focusCount} focus tasks`;
+  elements.focusIndicatorText.textContent = label;
+  elements.focusIndicator.setAttribute("aria-label", `${label}. Open focus tasks.`);
 }
 
 function updateStickyCountPills() {

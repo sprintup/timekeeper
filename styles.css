@@ -405,6 +405,12 @@ button {
   display: none;
 }
 
+.focus-indicator {
+  border-color: #d1b84c;
+  background: var(--yellow);
+  color: #564713;
+}
+
 .urgent-alert-icon {
   display: inline-flex;
   align-items: center;
@@ -414,6 +420,19 @@ button {
   border: 2px solid currentColor;
   border-radius: 50%;
   font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.focus-alert-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-size: 0.66rem;
   font-weight: 900;
   line-height: 1;
 }
@@ -1550,7 +1569,8 @@ body.is-board-dragging * {
 }
 
 #flaggedNotesDialog .modal-body,
-#urgentTasksDialog .modal-body {
+#urgentTasksDialog .modal-body,
+#focusTasksDialog .modal-body {
   grid-template-rows: auto minmax(0, 1fr) auto;
   max-height: calc(100vh - 64px);
 }
@@ -1571,6 +1591,7 @@ body.is-board-dragging * {
 
 .flagged-notes-list,
 .urgent-tasks-list,
+.focus-tasks-list,
 .unfinished-tasks-list {
   max-height: min(58vh, 520px);
   min-height: 0;
@@ -1654,6 +1675,7 @@ body.is-board-dragging * {
 
 .flagged-note-item,
 .urgent-task-item,
+.focus-task-item,
 .unfinished-task-item {
   align-items: start;
 }
@@ -1671,6 +1693,7 @@ body.is-board-dragging * {
 
 .flagged-note-open,
 .urgent-task-open,
+.focus-task-open,
 .unfinished-task-open {
   appearance: none;
   display: grid;
@@ -1687,13 +1710,16 @@ body.is-board-dragging * {
 .flagged-note-open:focus-visible .flagged-note-text,
 .urgent-task-open:hover .urgent-task-text,
 .urgent-task-open:focus-visible .urgent-task-text,
+.focus-task-open:hover .focus-task-text,
+.focus-task-open:focus-visible .focus-task-text,
 .unfinished-task-open:hover .unfinished-task-text,
 .unfinished-task-open:focus-visible .unfinished-task-text {
   text-decoration: underline;
 }
 
 .flagged-note-context,
-.urgent-task-context {
+.urgent-task-context,
+.focus-task-context {
   color: var(--muted);
   font-size: 0.78rem;
   font-weight: 900;
@@ -1702,6 +1728,7 @@ body.is-board-dragging * {
 
 .flagged-note-text,
 .urgent-task-text,
+.focus-task-text,
 .unfinished-task-text {
   font-weight: 800;
 }

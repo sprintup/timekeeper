@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Timekeeper</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="styles.css?v=20260505-standup-section-headers">
+    <link rel="stylesheet" href="styles.css?v=20260505-focus-pill">
   </head>
   <body>
     <div class="app-shell">
@@ -106,6 +106,10 @@
           <button class="urgent-indicator" id="urgentIndicator" type="button" hidden>
             <span class="urgent-alert-icon" aria-hidden="true">!</span>
             <span id="urgentIndicatorText">urgent tasks</span>
+          </button>
+          <button class="urgent-indicator focus-indicator" id="focusIndicator" type="button" hidden>
+            <span class="focus-alert-icon" aria-hidden="true">F</span>
+            <span id="focusIndicatorText">focus tasks</span>
           </button>
           <button class="sticky-status-pill flagged-notes-button" id="flaggedNotesButton" type="button">
             <span class="urgent-flag flagged-notes-icon" aria-hidden="true"></span>
@@ -318,6 +322,21 @@
       </div>
     </dialog>
 
+    <dialog class="modal modal-wide" id="focusTasksDialog">
+      <div class="modal-body">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Focus</p>
+            <h2>Focus tasks</h2>
+          </div>
+        </div>
+        <div class="time-log-list focus-tasks-list" id="focusTasksList"></div>
+        <div class="modal-actions">
+          <button class="button button-secondary" type="button" data-action="close-focus-tasks-dialog">Close</button>
+        </div>
+      </div>
+    </dialog>
+
     <dialog class="modal modal-wide" id="unfinishedTasksDialog">
       <div class="modal-body">
         <div class="modal-header">
@@ -487,6 +506,6 @@
         </div>
       </div>
     </dialog>
-    <script src="script.js?v=20260505-standup-nested-notes"></script>
+    <script src="script.js?v=20260505-focus-pill"></script>
   </body>
 </html>
