@@ -190,6 +190,8 @@ function cacheElements() {
   elements.deleteAfterReportInput = document.getElementById("deleteAfterReportInput");
   elements.standupSummaryDialog = document.getElementById("standupSummaryDialog");
   elements.standupSummaryPreview = document.getElementById("standupSummaryPreview");
+  elements.copyStandupSummaryButton = document.getElementById("copyStandupSummaryButton");
+  elements.copyStandupSummaryStatus = document.getElementById("copyStandupSummaryStatus");
   elements.lastStandupDateInput = document.getElementById("lastStandupDateInput");
 }
 
@@ -220,6 +222,7 @@ function bindEvents() {
   elements.reportForm.addEventListener("submit", downloadReportFromDialog);
   elements.emailReportButton.addEventListener("click", emailReportFromDialog);
   elements.copyReportButton.addEventListener("click", copyReportFromDialog);
+  elements.copyStandupSummaryButton.addEventListener("click", copyStandupSummaryFromDialog);
   elements.lastStandupDateInput?.addEventListener("change", saveLastStandupDateFromInput);
   elements.flaggedNotesButton.addEventListener("click", openFlaggedNotesDialog);
   elements.urgentIndicator.addEventListener("click", openUrgentTasksDialog);
@@ -1623,7 +1626,9 @@ function toggleFinishNoteFlag(taskId, noteId) {
   }
 
   note.flagged = !note.flagged;
-  if (!note.flagged) {
+  if (note.flagged) {
+    addStandupHighlightKey(getStandupBlockerHighlightKey(task, note.id));
+  } else {
     removeStandupHighlightKey(getStandupBlockerHighlightKey(task, note.id));
   }
   saveState();
@@ -1638,6 +1643,10 @@ function toggleFinishNoteFlag(taskId, noteId) {
 
   if (elements.goalNotesDialog.open) {
     renderGoalNotesModal();
+  }
+
+  if (elements.standupSummaryDialog.open) {
+    renderStandupSummaryPreview();
   }
 
   updateFlaggedNotesButton();
@@ -3603,27 +3612,25 @@ function renderStandupSummaryPreview() {
     elements.standupSummaryPreview,
     "What I did since last standup",
     summary.sinceLastStandupTasks,
-    formatStandupGroupedCompletedTask,
     "since"
   );
-  appendStandupPreviewSection(
+  appendStandupGroupedPreviewSection(
     elements.standupSummaryPreview,
     "What I'm doing today",
     summary.todayTasks,
-    formatStandupTodayTask,
     "today"
   );
-  appendStandupPreviewSection(
+  appendStandupGroupedPreviewSection(
     elements.standupSummaryPreview,
     "What I'm stuck on",
     summary.blockers,
-    formatStandupBlocker,
     "blocker"
   );
 }
 
 function appendStandupPreviewSection(parent, title, items, formatter, sectionKey) {
   const heading = document.createElement("h4");
+  heading.className = `standup-heading-${sectionKey}`;
   heading.textContent = title;
 
   const list = document.createElement("ul");
@@ -3640,8 +3647,9 @@ function appendStandupPreviewSection(parent, title, items, formatter, sectionKey
   parent.append(heading, list);
 }
 
-function appendStandupGroupedPreviewSection(parent, title, items, formatter, sectionKey) {
+function appendStandupGroupedPreviewSection(parent, title, items, sectionKey) {
   const heading = document.createElement("h4");
+  heading.className = `standup-heading-${sectionKey}`;
   heading.textContent = title;
   parent.appendChild(heading);
 
@@ -3659,11 +3667,12 @@ function appendStandupGroupedPreviewSection(parent, title, items, formatter, sec
     project.className = "standup-project-group";
 
     const projectHeading = document.createElement("h5");
+    projectHeading.className = `standup-heading-${sectionKey}`;
     projectHeading.textContent = group.label;
 
     const list = document.createElement("ul");
-    group.items.forEach((item) => {
-      list.appendChild(createStandupSummaryItem(item, formatter, sectionKey));
+    getStandupTaskGroups(group.items).forEach((taskGroup) => {
+      list.appendChild(createStandupTaskGroupItem(taskGroup, sectionKey));
     });
 
     project.append(projectHeading, list);
@@ -3697,32 +3706,139 @@ function getStandupProjectGroups(items) {
     }));
 }
 
+function getStandupTaskGroups(items) {
+  const groups = new Map();
+
+  items.forEach((item) => {
+    const key = getStandupTaskGroupKey(item);
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        objective: item.objective || "Untitled task",
+        order: Number.isInteger(item.order) ? item.order : Number.MAX_SAFE_INTEGER,
+        row: Number.isInteger(item.row) ? item.row : Number.MAX_SAFE_INTEGER,
+        sortTime: getStandupItemSortTime(item),
+        summaryItem: null,
+        notes: [],
+      });
+    }
+
+    const group = groups.get(key);
+    group.objective = item.objective || group.objective;
+    group.order = Math.min(group.order, Number.isInteger(item.order) ? item.order : Number.MAX_SAFE_INTEGER);
+    group.row = Math.min(group.row, Number.isInteger(item.row) ? item.row : Number.MAX_SAFE_INTEGER);
+    group.sortTime = Math.min(group.sortTime, getStandupItemSortTime(item));
+
+    if (isStandupNoteEntry(item)) {
+      group.notes.push(item);
+    } else {
+      group.summaryItem = item;
+    }
+  });
+
+  return [...groups.values()]
+    .sort((a, b) => a.sortTime - b.sortTime || a.order - b.order || a.objective.localeCompare(b.objective))
+    .map((group) => ({
+      ...group,
+      notes: group.notes.sort((a, b) => getStandupItemSortTime(a) - getStandupItemSortTime(b)),
+    }));
+}
+
+function getStandupTaskGroupKey(item) {
+  if (item.taskId) {
+    return item.taskId;
+  }
+
+  return item.id || item.objective || "task";
+}
+
+function getStandupItemSortTime(item) {
+  return Number.isFinite(item.sortTime) ? item.sortTime : Number.MAX_SAFE_INTEGER;
+}
+
+function isStandupNoteEntry(item) {
+  return item.type === "reported-note" || item.type === "flagged-note";
+}
+
+function createStandupTaskGroupItem(taskGroup, sectionKey) {
+  const taskItem = document.createElement("li");
+  taskItem.className = "standup-task-group-item";
+
+  const summaryItem = taskGroup.summaryItem;
+  const title = formatStandupTaskGroupTitle(taskGroup, sectionKey);
+  if (summaryItem) {
+    taskItem.appendChild(createStandupSummaryItemContent(summaryItem, title, sectionKey));
+  } else {
+    const titleText = document.createElement("span");
+    titleText.className = "standup-task-title";
+    titleText.textContent = title;
+    taskItem.appendChild(titleText);
+  }
+
+  if (taskGroup.notes.length > 0) {
+    const noteList = document.createElement("ul");
+    noteList.className = "standup-task-note-list";
+    taskGroup.notes.forEach((note) => {
+      const noteItem = document.createElement("li");
+      noteItem.appendChild(createStandupSummaryItemContent(note, formatStandupNoteText(note), sectionKey));
+      noteList.appendChild(noteItem);
+    });
+    taskItem.appendChild(noteList);
+  }
+
+  return taskItem;
+}
+
+function formatStandupTaskGroupTitle(taskGroup, sectionKey) {
+  if (taskGroup.summaryItem) {
+    if (sectionKey === "since") {
+      return formatStandupGroupedCompletedTask(taskGroup.summaryItem);
+    }
+
+    if (sectionKey === "today") {
+      return formatStandupTodayTask(taskGroup.summaryItem);
+    }
+  }
+
+  return taskGroup.objective;
+}
+
+function formatStandupNoteText(entry) {
+  return entry.note;
+}
+
 function createStandupSummaryItem(item, formatter, sectionKey) {
+  const listItem = document.createElement("li");
+  listItem.appendChild(createStandupSummaryItemContent(item, formatter(item), sectionKey));
+  return listItem;
+}
+
+function createStandupSummaryItemContent(item, text, sectionKey) {
   const itemKey = getStandupSummaryItemKey(sectionKey, item);
   const isHighlighted = standupHighlightedKeys.has(itemKey);
-  const listItem = document.createElement("li");
-  listItem.className = "standup-summary-item";
-  listItem.classList.toggle("is-highlighted", isHighlighted);
-  listItem.classList.toggle("is-report-only", isReportOnlyStandupSection(sectionKey));
-  listItem.classList.toggle("is-focus-highlight", isFocusStandupSection(sectionKey));
-  listItem.classList.toggle("is-blocker-highlight", sectionKey === "blocker");
-  listItem.dataset.standupKey = itemKey;
-  listItem.tabIndex = 0;
-  listItem.setAttribute("role", "button");
-  listItem.setAttribute("aria-pressed", String(isHighlighted));
-  listItem.textContent = formatter(item);
-  listItem.addEventListener("click", () => {
-    toggleStandupSummaryItemHighlight(listItem);
+  const content = document.createElement("span");
+  content.className = "standup-summary-item";
+  content.classList.toggle("is-highlighted", isHighlighted);
+  content.classList.toggle("is-report-only", isReportOnlyStandupSection(sectionKey));
+  content.classList.toggle("is-focus-highlight", isFocusStandupSection(sectionKey));
+  content.classList.toggle("is-blocker-highlight", sectionKey === "blocker");
+  content.dataset.standupKey = itemKey;
+  content.tabIndex = 0;
+  content.setAttribute("role", "button");
+  content.setAttribute("aria-pressed", String(isHighlighted));
+  content.textContent = text;
+  content.addEventListener("click", () => {
+    toggleStandupSummaryItemHighlight(content);
   });
-  listItem.addEventListener("keydown", (event) => {
+  content.addEventListener("keydown", (event) => {
     if (event.key !== "Enter" && event.key !== " ") {
       return;
     }
 
     event.preventDefault();
-    toggleStandupSummaryItemHighlight(listItem);
+    toggleStandupSummaryItemHighlight(content);
   });
-  return listItem;
+  return content;
 }
 
 function getStandupSummaryItemKey(sectionKey, item) {
@@ -3797,11 +3913,11 @@ function getStandupReportedNoteHighlightKey(task, noteId) {
 
 function softDeleteStandupNoteHighlightWithPrompt(key) {
   const target = getStandupNoteHighlightTarget(key);
-  if (!target) {
+  if (!target || target.type !== "reported") {
     return { handled: false, cancelled: false };
   }
 
-  const actionLabel = target.type === "reported" ? "Report in standup" : "Flag for elevation";
+  const actionLabel = "Report in standup";
   const activityName = getRowName(target.task.row);
   const taskObjective = target.task.objective;
   console.info(
@@ -3814,11 +3930,7 @@ function softDeleteStandupNoteHighlightWithPrompt(key) {
     return { handled: true, cancelled: true };
   }
 
-  if (target.type === "reported") {
-    target.note.reported = false;
-  } else {
-    target.note.flagged = false;
-  }
+  target.note.reported = false;
 
   return { handled: true, cancelled: false };
 }
@@ -3900,9 +4012,15 @@ function buildStandupSummary() {
     todayTasks: [...urgentTasks, ...prioritizedTasks],
     blockers: getFlaggedNotes().map(({ task, note }) => ({
       id: `${task.id}:${note.id}`,
+      type: "flagged-note",
+      taskId: task.id,
+      noteId: note.id,
       activity: getRowName(task.row),
       objective: task.objective,
       note: note.text,
+      order: task.order,
+      row: task.row,
+      sortTime: new Date(note.createdAt || task.createdAt || Date.now()).getTime(),
     })),
   };
 }
@@ -3921,6 +4039,8 @@ function getReportedStandupNotes() {
       .map((note) => ({
         id: `${task.id}:${note.id}`,
         type: "reported-note",
+        taskId: task.id,
+        noteId: note.id,
         row: task.row,
         order: task.order,
         objective: task.objective,
@@ -3999,11 +4119,53 @@ function formatStandupGroupedCompletedTask(entry) {
 }
 
 function formatStandupTodayTask(entry) {
-  return `${entry.urgent ? "[Urgent] " : ""}${entry.objective} (${entry.activity})`;
+  return `${entry.urgent ? "[Urgent] " : ""}${entry.objective}`;
 }
 
 function formatStandupBlocker(entry) {
-  return `${entry.activity} / ${entry.objective}: ${entry.note}`;
+  return `${entry.objective}: ${entry.note}`;
+}
+
+function buildStandupSummaryText(summary = buildStandupSummary()) {
+  const lines = [
+    "Standup Summary",
+    `Last standup: ${getLastStandupDateValue()}`,
+    "",
+  ];
+
+  appendStandupSummaryTextSection(lines, "What I did since last standup", summary.sinceLastStandupTasks, "since");
+  appendStandupSummaryTextSection(lines, "What I'm doing today", summary.todayTasks, "today");
+  appendStandupSummaryTextSection(lines, "What I'm stuck on", summary.blockers, "blocker");
+
+  return `${lines.join("\n").trimEnd()}\n`;
+}
+
+function appendStandupSummaryTextSection(lines, title, items, sectionKey) {
+  lines.push(title);
+
+  if (items.length === 0) {
+    lines.push("- None", "");
+    return;
+  }
+
+  getStandupProjectGroups(items).forEach((group) => {
+    lines.push(group.label);
+    getStandupTaskGroups(group.items).forEach((taskGroup) => {
+      const summaryItem = taskGroup.summaryItem;
+      const taskHighlightPrefix = summaryItem && standupHighlightedKeys.has(getStandupSummaryItemKey(sectionKey, summaryItem))
+        ? "[Highlighted] "
+        : "";
+      lines.push(`- ${taskHighlightPrefix}${formatStandupTaskGroupTitle(taskGroup, sectionKey)}`);
+      taskGroup.notes.forEach((note) => {
+        const noteHighlightPrefix = standupHighlightedKeys.has(getStandupSummaryItemKey(sectionKey, note))
+          ? "[Highlighted] "
+          : "";
+        lines.push(`  - ${noteHighlightPrefix}${formatStandupNoteText(note)}`);
+      });
+    });
+  });
+
+  lines.push("");
 }
 
 function getStandupRangeStart() {
@@ -4235,6 +4397,33 @@ async function copyReportFromDialog() {
   }, 1800);
 }
 
+async function copyStandupSummaryFromDialog() {
+  const summaryText = buildStandupSummaryText();
+  const originalText = elements.copyStandupSummaryButton.textContent;
+  elements.copyStandupSummaryButton.textContent = "Copying";
+  elements.copyStandupSummaryButton.disabled = true;
+  setStandupSummaryCopyStatus("");
+
+  try {
+    await copyTextToClipboard(summaryText);
+    elements.copyStandupSummaryButton.textContent = "Copied";
+    setStandupSummaryCopyStatus("Copied to clipboard.");
+  } catch (error) {
+    elements.copyStandupSummaryButton.textContent = "Copy failed";
+    setStandupSummaryCopyStatus("Copy failed.");
+  }
+
+  window.setTimeout(() => {
+    if (!elements.copyStandupSummaryButton.isConnected) {
+      return;
+    }
+
+    elements.copyStandupSummaryButton.textContent = originalText;
+    elements.copyStandupSummaryButton.disabled = false;
+    setStandupSummaryCopyStatus("");
+  }, 1800);
+}
+
 async function copyTextToClipboard(text) {
   if (navigator.clipboard?.writeText && window.isSecureContext) {
     try {
@@ -4280,6 +4469,11 @@ function copyTextWithFallback(text) {
 function setCopyReportStatus(message) {
   elements.copyReportStatus.textContent = message;
   elements.copyReportStatus.hidden = !message;
+}
+
+function setStandupSummaryCopyStatus(message) {
+  elements.copyStandupSummaryStatus.textContent = message;
+  elements.copyStandupSummaryStatus.hidden = !message;
 }
 
 function buildReport(options = {}) {
