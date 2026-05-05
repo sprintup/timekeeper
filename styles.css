@@ -1685,6 +1685,11 @@ body.is-board-dragging * {
   background: var(--green);
 }
 
+.focus-task-item.is-active {
+  border-color: var(--green-line);
+  background: var(--green);
+}
+
 .unfinished-task-content {
   display: grid;
   gap: 8px;

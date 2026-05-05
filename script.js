@@ -1889,6 +1889,7 @@ function renderFocusTasksModal() {
   focusTasks.forEach((task) => {
     const item = document.createElement("div");
     item.className = "log-item focus-task-item";
+    item.classList.toggle("is-active", isTaskRunning(task));
     item.dataset.taskId = task.id;
 
     const openButton = document.createElement("button");
