@@ -1380,7 +1380,7 @@ function createTaskCard(task) {
   bucket.value = task.bucket;
   bucket.dataset.bucket = task.bucket;
   objective.textContent = task.objective;
-  started.textContent = getFirstStartedAt(task) ? formatTime(getFirstStartedAt(task)) : "Not started";
+  started.textContent = formatTaskStartedAt(task);
   elapsed.dataset.elapsedTaskId = task.id;
   elapsed.textContent = formatDuration(getTaskElapsed(task));
   finished.textContent = task.finishedAt ? formatTime(task.finishedAt) : "";
@@ -4802,6 +4802,22 @@ function getFirstStartedAt(task) {
   return first?.start || null;
 }
 
+function formatTaskStartedAt(task) {
+  const startedAt = getFirstStartedAt(task);
+  if (!startedAt) {
+    return "Not started";
+  }
+
+  const startedDate = new Date(startedAt);
+  if (Number.isNaN(startedDate.getTime())) {
+    return "Not started";
+  }
+
+  return isSameLocalDate(startedDate, new Date())
+    ? formatTime(startedDate)
+    : formatDate(startedDate);
+}
+
 function getTaskElapsed(task) {
   const now = new Date();
   return task.logs.reduce((total, log) => total + getLogDuration(log, now), 0);
@@ -5370,6 +5386,20 @@ function formatTime(value) {
     minute: "2-digit",
     second: "2-digit",
   }).format(new Date(value));
+}
+
+function formatDate(value) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+function isSameLocalDate(left, right) {
+  return left.getFullYear() === right.getFullYear()
+    && left.getMonth() === right.getMonth()
+    && left.getDate() === right.getDate();
 }
 
 function toDateTimeLocalValue(value) {
