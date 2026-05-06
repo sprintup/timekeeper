@@ -1383,7 +1383,7 @@ function createTaskCard(task) {
   started.textContent = formatTaskStartedAt(task);
   elapsed.dataset.elapsedTaskId = task.id;
   elapsed.textContent = formatDuration(getTaskElapsed(task));
-  finished.textContent = task.finishedAt ? formatTime(task.finishedAt) : "";
+  finished.textContent = formatTaskFinishedAt(task);
   toggleButton.textContent = isTaskRunning(task) ? "Pause" : "Start";
   urgentButton.classList.toggle("is-active", task.urgent);
   urgentButton.setAttribute("aria-pressed", String(task.urgent));
@@ -4808,14 +4808,26 @@ function formatTaskStartedAt(task) {
     return "Not started";
   }
 
-  const startedDate = new Date(startedAt);
-  if (Number.isNaN(startedDate.getTime())) {
-    return "Not started";
+  return formatTileDateOrTime(startedAt, "Not started");
+}
+
+function formatTaskFinishedAt(task) {
+  if (!task.finishedAt) {
+    return "";
   }
 
-  return isSameLocalDate(startedDate, new Date())
-    ? formatTime(startedDate)
-    : formatDate(startedDate);
+  return formatTileDateOrTime(task.finishedAt, "");
+}
+
+function formatTileDateOrTime(value, fallback) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return fallback;
+  }
+
+  return isSameLocalDate(date, new Date())
+    ? formatTime(date)
+    : formatDate(date);
 }
 
 function getTaskElapsed(task) {
