@@ -5390,9 +5390,9 @@ function formatTime(value) {
 
 function formatDate(value) {
   return new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
     month: "short",
     day: "numeric",
-    year: "numeric",
   }).format(new Date(value));
 }
 
