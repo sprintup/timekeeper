@@ -1685,6 +1685,7 @@ body.is-board-dragging * {
   background: var(--green);
 }
 
+.urgent-task-item.is-active,
 .focus-task-item.is-active {
   border-color: var(--green-line);
   background: var(--green);

@@ -1977,6 +1977,7 @@ function renderUrgentTasksModal() {
   urgentTasks.forEach((task) => {
     const item = document.createElement("div");
     item.className = "log-item urgent-task-item";
+    item.classList.toggle("is-active", isTaskRunning(task));
     item.dataset.taskId = task.id;
 
     const openButton = document.createElement("button");
