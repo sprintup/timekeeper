@@ -444,6 +444,19 @@
       </div>
     </dialog>
 
+    <dialog class="modal" id="backupPermissionDialog">
+      <div class="modal-body">
+        <div class="modal-header">
+          <h2>Backup permission needed</h2>
+        </div>
+        <p>Timekeeper needs browser permission to write today's backup file. Use Save backup now to approve the backup folder and save the current data.</p>
+        <div class="modal-actions">
+          <button class="button button-secondary" type="button" data-action="close-backup-permission-dialog">Later</button>
+          <button class="button button-primary" id="backupPermissionSaveNowButton" type="button">Save backup now</button>
+        </div>
+      </div>
+    </dialog>
+
     <dialog class="modal modal-wide" id="reportDialog">
       <form id="reportForm" method="dialog">
         <div class="modal-header">
@@ -506,6 +519,6 @@
         </div>
       </div>
     </dialog>
-    <script src="script.js?v=20260506-start-finish-weekday-tile"></script>
+    <script src="script.js?v=20260506-backup-permission-prompt"></script>
   </body>
 </html>

@@ -9,6 +9,7 @@ const BACKUP_STORE_NAME = "file-handles";
 const BACKUP_HANDLE_KEY = "backup-directory";
 const BACKUP_META_KEY = "timekeeper.backup.meta.v1";
 const BACKUP_SETTINGS_KEY = "timekeeper.backup.settings.v1";
+const BACKUP_PERMISSION_PROMPT_KEY = "timekeeper.backup.permissionPromptDate.v1";
 const BACKUP_FILE_PREFIX = "bk-timekeeper";
 const STANDUP_SETTINGS_KEY = "timekeeper.standup.settings.v1";
 
@@ -121,6 +122,8 @@ function cacheElements() {
   elements.backupFileName = document.getElementById("backupFileName");
   elements.backupIntervalForm = document.getElementById("backupIntervalForm");
   elements.backupIntervalMinutesInput = document.getElementById("backupIntervalMinutesInput");
+  elements.backupPermissionDialog = document.getElementById("backupPermissionDialog");
+  elements.backupPermissionSaveNowButton = document.getElementById("backupPermissionSaveNowButton");
   elements.resetStateButton = document.getElementById("resetStateButton");
   elements.scrollTopButton = document.getElementById("scrollTopButton");
   elements.flaggedNotesButton = document.getElementById("flaggedNotesButton");
@@ -208,6 +211,7 @@ function bindEvents() {
   elements.settingsButton?.addEventListener("click", openSettingsDialog);
   elements.chooseBackupDirectoryButton?.addEventListener("click", chooseBackupDirectory);
   elements.saveBackupNowButton?.addEventListener("click", () => saveBackupNow("manual"));
+  elements.backupPermissionSaveNowButton?.addEventListener("click", saveBackupFromPermissionDialog);
   elements.backupIntervalForm?.addEventListener("submit", saveBackupIntervalFromForm);
   elements.resetStateButton.addEventListener("click", resetStateWithPrompt);
   elements.timeGoalForm.addEventListener("submit", saveTimeGoalFromForm);
@@ -337,6 +341,11 @@ function handleDocumentClick(event) {
 
   if (action === "close-settings-dialog") {
     closeDialog(elements.settingsDialog);
+    return;
+  }
+
+  if (action === "close-backup-permission-dialog") {
+    closeDialog(elements.backupPermissionDialog);
     return;
   }
 
@@ -653,6 +662,7 @@ async function restoreBackupDirectoryHandle() {
     setBackupStatus(formatBackupReadyStatus(await getLatestBackupMetadata()));
   } else {
     setBackupStatus("Backup folder needs permission. Use Save backup now.");
+    maybeOpenBackupPermissionDialog();
   }
 }
 
@@ -712,7 +722,12 @@ async function saveBackupNow(source = "manual") {
   try {
     const hasPermission = await verifyBackupPermission(backupDirectoryHandle, source === "manual");
     if (!hasPermission) {
-      setBackupStatus("Backup permission needed. Use Backup folder to choose it again.");
+      setBackupStatus(source === "manual"
+        ? "Backup permission was not granted. Use Backup folder to choose it again."
+        : "Backup permission needed. Use Save backup now.");
+      if (source !== "manual") {
+        maybeOpenBackupPermissionDialog();
+      }
       return;
     }
 
@@ -732,6 +747,29 @@ async function saveBackupNow(source = "manual") {
     backupSaveInProgress = false;
     updateBackupControls();
   }
+}
+
+async function saveBackupFromPermissionDialog() {
+  closeDialog(elements.backupPermissionDialog);
+  await saveBackupNow("manual");
+}
+
+function maybeOpenBackupPermissionDialog() {
+  if (!elements.backupPermissionDialog || !backupDirectoryHandle) {
+    return;
+  }
+
+  const todayKey = formatFileDate(new Date());
+  if (window.localStorage.getItem(BACKUP_PERMISSION_PROMPT_KEY) === todayKey) {
+    return;
+  }
+
+  if (elements.backupPermissionDialog.open || document.querySelector("dialog[open]")) {
+    return;
+  }
+
+  window.localStorage.setItem(BACKUP_PERMISSION_PROMPT_KEY, todayKey);
+  openDialog(elements.backupPermissionDialog);
 }
 
 async function verifyBackupPermission(fileHandle, shouldRequest) {
@@ -1063,6 +1101,7 @@ function applyImportedState(importedState) {
   closeDialog(elements.reportDialog);
   closeDialog(elements.standupSummaryDialog);
   closeDialog(elements.settingsDialog);
+  closeDialog(elements.backupPermissionDialog);
   render();
 }
 
@@ -3624,6 +3663,7 @@ function resetStateWithPrompt() {
   closeDialog(elements.reportDialog);
   closeDialog(elements.standupSummaryDialog);
   closeDialog(elements.settingsDialog);
+  closeDialog(elements.backupPermissionDialog);
   render();
 }
 
