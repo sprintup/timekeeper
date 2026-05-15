@@ -454,6 +454,12 @@ button {
   cursor: pointer;
 }
 
+.summary-pill {
+  border-color: var(--blue-dark);
+  background: #f3f8fb;
+  color: var(--blue-dark);
+}
+
 .urgent-flag {
   position: relative;
   display: inline-block;
@@ -619,6 +625,12 @@ summary:focus-visible {
   border-color: var(--red);
   background: var(--red-soft);
   color: #70251e;
+}
+
+.button-focus.is-active {
+  border-color: #d1b84c;
+  background: var(--yellow);
+  color: #5f4c00;
 }
 
 .button-small {
@@ -1038,6 +1050,15 @@ body.is-board-dragging * {
 
 .task-actions {
   margin-top: 12px;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.task-actions .button-small {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 6px;
+  font-size: 0.78rem;
 }
 
 .button-restart {
@@ -1049,6 +1070,10 @@ body.is-board-dragging * {
 }
 
 .task-card.is-finished .button-urgent {
+  display: none;
+}
+
+.task-card.is-finished .button-focus {
   display: none;
 }
 
@@ -1618,11 +1643,66 @@ body.is-board-dragging * {
   background: rgba(255, 255, 255, 0.72);
 }
 
-.goal-note-group h3 {
+.goal-note-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
   margin: 0;
   color: var(--ink);
+  cursor: pointer;
   font-size: 0.95rem;
+  font-weight: 900;
   overflow-wrap: anywhere;
+}
+
+.goal-note-heading::marker {
+  color: var(--muted);
+}
+
+.goal-note-task-title {
+  min-width: 0;
+}
+
+.goal-note-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.goal-note-badge {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 7px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.goal-note-badge.is-finished {
+  border-color: var(--green-line);
+  background: var(--green);
+  color: #285a2b;
+}
+
+.goal-note-badge.is-flagged {
+  border-color: var(--red);
+  background: var(--red-soft);
+  color: #70251e;
+}
+
+.goal-note-group-body {
+  display: grid;
+  gap: 8px;
+}
+
+.goal-note-finished-preview,
+.goal-note-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 800;
 }
 
 .goal-note-items {

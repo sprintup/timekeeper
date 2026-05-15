@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Timekeeper</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="styles.css?v=20260505-focus-pill">
+    <link rel="stylesheet" href="styles.css?v=20260515-task-focus">
   </head>
   <body>
     <div class="app-shell">
@@ -111,6 +111,7 @@
             <span class="focus-alert-icon" aria-hidden="true">F</span>
             <span id="focusIndicatorText">focus tasks</span>
           </button>
+          <button class="sticky-status-pill summary-pill" id="standupSummaryPill" type="button">summary</button>
           <button class="sticky-status-pill flagged-notes-button" id="flaggedNotesButton" type="button">
             <span class="urgent-flag flagged-notes-icon" aria-hidden="true"></span>
             <span>0</span>
@@ -168,6 +169,7 @@
         <div class="task-actions">
           <button class="button button-small button-start" data-action="toggle-timer" type="button">Start</button>
           <button class="button button-small button-urgent" data-action="toggle-urgent" type="button">Urgent</button>
+          <button class="button button-small button-focus" data-action="toggle-task-focus" type="button">Focus</button>
           <button class="button button-small" data-action="finish-task" type="button">Finish</button>
           <button class="button button-small button-restart" data-action="restart-task" type="button">Restart</button>
         </div>
@@ -364,8 +366,12 @@
       <div class="modal-body">
         <div class="modal-header">
           <div>
-            <p class="eyebrow">Activity Notes</p>
-            <h2 id="goalNotesDialogTitle">Activity notes</h2>
+            <p class="eyebrow">Quickview</p>
+            <h2 id="goalNotesDialogTitle">Quickview</h2>
+          </div>
+          <div class="modal-header-actions">
+            <button class="button button-small button-secondary" type="button" data-action="expand-goal-notes">Unfold all</button>
+            <button class="button button-small button-secondary" type="button" data-action="collapse-goal-notes">Fold all</button>
           </div>
         </div>
         <div class="goal-notes-list" id="goalNotesList"></div>

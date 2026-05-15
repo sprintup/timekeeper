@@ -12,6 +12,7 @@ const BACKUP_SETTINGS_KEY = "timekeeper.backup.settings.v1";
 const BACKUP_PERMISSION_PROMPT_KEY = "timekeeper.backup.permissionPromptDate.v1";
 const BACKUP_FILE_PREFIX = "bk-timekeeper";
 const STANDUP_SETTINGS_KEY = "timekeeper.standup.settings.v1";
+const DEFAULT_FAVICON_HREF = "favicon.svg";
 
 const state = {
   tasks: [],
@@ -36,6 +37,7 @@ let backupSaveInProgress = false;
 let backupAutoSaveMinutes = DEFAULT_BACKUP_AUTOSAVE_MINUTES;
 let standupLastDate = "";
 let standupHighlightedKeys = new Set();
+let currentFaviconRunningState = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   updateDocumentTitle();
@@ -87,6 +89,7 @@ function isPrivateIpv4Host(hostname) {
 }
 
 function cacheElements() {
+  elements.faviconLink = document.querySelector('link[rel~="icon"]');
   elements.board = document.getElementById("board");
   elements.todayDate = document.getElementById("todayDate");
   elements.taskTemplate = document.getElementById("taskCardTemplate");
@@ -128,6 +131,7 @@ function cacheElements() {
   elements.scrollTopButton = document.getElementById("scrollTopButton");
   elements.flaggedNotesButton = document.getElementById("flaggedNotesButton");
   elements.standupSummaryButton = document.getElementById("standupSummaryButton");
+  elements.standupSummaryPill = document.getElementById("standupSummaryPill");
 
   elements.taskDialog = document.getElementById("taskDialog");
   elements.taskForm = document.getElementById("taskForm");
@@ -205,6 +209,7 @@ function cacheElements() {
 function bindEvents() {
   elements.generateReportButton.addEventListener("click", openReportDialog);
   elements.standupSummaryButton?.addEventListener("click", openStandupSummaryDialog);
+  elements.standupSummaryPill?.addEventListener("click", openStandupSummaryDialog);
   elements.exportDataButton.addEventListener("click", exportData);
   elements.importDataButton.addEventListener("click", () => elements.importDataInput.click());
   elements.importDataInput.addEventListener("change", importDataFromFile);
@@ -320,6 +325,16 @@ function handleDocumentClick(event) {
 
   if (action === "collapse-unfinished-tasks") {
     setUnfinishedTaskGroupsOpen(false);
+    return;
+  }
+
+  if (action === "expand-goal-notes") {
+    setGoalNoteGroupsOpen(true);
+    return;
+  }
+
+  if (action === "collapse-goal-notes") {
+    setGoalNoteGroupsOpen(false);
     return;
   }
 
@@ -459,6 +474,10 @@ function handleDocumentClick(event) {
 
   if (action === "toggle-urgent") {
     toggleUrgent(taskId);
+  }
+
+  if (action === "toggle-task-focus") {
+    toggleTaskFocus(taskId);
   }
 
   if (action === "finish-task") {
@@ -1231,6 +1250,8 @@ function render() {
   rows.forEach((tasks, rowIndex) => {
     const goalNoteCount = getGoalNoteCount(tasks);
     const goalHasFlaggedNotes = tasks.some(taskHasFlaggedNotes);
+    const quickviewLabel = `Quickview (${tasks.length})`;
+    const quickviewAriaLabel = `${quickviewLabel}: ${formatTaskCount(tasks.length, "total")}, ${goalNoteCount} note${goalNoteCount === 1 ? "" : "s"}${goalHasFlaggedNotes ? ", includes flagged note" : ""}`;
     const unfinishedTaskCount = tasks.filter((task) => task.status !== "finished").length;
     const focusTaskCount = tasks.filter(isTaskHighlightedInStandup).length;
     const urgentTaskCount = tasks.filter((task) => task.urgent).length;
@@ -1254,8 +1275,8 @@ function render() {
       </div>
       <div class="row-label-actions">
         <button class="icon-button row-add-task-button" data-action="add-side-quest" data-row-index="${rowIndex}" type="button">Add task</button>
-        <button class="icon-button row-notes-button${goalHasFlaggedNotes ? " has-flagged-note" : ""}" data-action="show-goal-notes" data-row-index="${rowIndex}" aria-label="${goalHasFlaggedNotes ? `Notes (${goalNoteCount}), includes flagged note` : `Notes (${goalNoteCount})`}" type="button">
-          <span>Notes (${goalNoteCount})</span>
+        <button class="icon-button row-notes-button${goalHasFlaggedNotes ? " has-flagged-note" : ""}" data-action="show-goal-notes" data-row-index="${rowIndex}" aria-label="${quickviewAriaLabel}" type="button">
+          <span>${quickviewLabel}</span>
           ${goalHasFlaggedNotes ? '<span class="urgent-flag note-flag-indicator" aria-hidden="true"></span>' : ""}
         </button>
       </div>
@@ -1405,15 +1426,17 @@ function createTaskCard(task) {
   const finished = fragment.querySelector(".finished-time");
   const toggleButton = fragment.querySelector('[data-action="toggle-timer"]');
   const urgentButton = fragment.querySelector('[data-action="toggle-urgent"]');
+  const focusButton = fragment.querySelector('[data-action="toggle-task-focus"]');
   const timeLogButton = fragment.querySelector('[data-action="show-log"]');
   const notesButton = fragment.querySelector('[data-action="show-notes"]');
+  const isFocused = isTaskHighlightedInStandup(task);
 
   card.dataset.taskId = task.id;
   card.classList.toggle("is-running", isTaskRunning(task));
   card.classList.toggle("is-finished", task.status === "finished");
   card.classList.toggle("is-unstarted", !getFirstStartedAt(task));
   card.classList.toggle("is-urgent", task.urgent);
-  card.classList.toggle("is-standup-highlighted", isTaskHighlightedInStandup(task));
+  card.classList.toggle("is-standup-highlighted", isFocused);
   dragHandle.addEventListener("pointerdown", handleTaskPointerDown);
 
   bucket.value = task.bucket;
@@ -1426,6 +1449,9 @@ function createTaskCard(task) {
   toggleButton.textContent = isTaskRunning(task) ? "Pause" : "Start";
   urgentButton.classList.toggle("is-active", task.urgent);
   urgentButton.setAttribute("aria-pressed", String(task.urgent));
+  focusButton.classList.toggle("is-active", isFocused);
+  focusButton.setAttribute("aria-pressed", String(isFocused));
+  focusButton.textContent = isFocused ? "Focused" : "Focus";
   timeLogButton.textContent = `Time log (${task.logs.length})`;
   renderTaskNotesButton(notesButton, task);
 
@@ -1763,21 +1789,31 @@ function renderGoalNotesModal() {
   elements.goalNotesDialogTitle.textContent = getRowName(rowIndex);
   elements.goalNotesList.innerHTML = "";
 
-  const noteGroups = getGoalNoteGroups(rowIndex);
+  const noteGroups = getGoalQuickviewGroups(rowIndex);
   if (noteGroups.length === 0) {
     const empty = document.createElement("p");
     empty.className = "empty-log";
-    empty.textContent = "No notes for this activity.";
+    empty.textContent = "No tasks in this quickview yet.";
     elements.goalNotesList.appendChild(empty);
     return;
   }
 
   noteGroups.forEach(({ task, notes }) => {
-    const section = document.createElement("section");
+    const section = document.createElement("details");
     section.className = "goal-note-group";
+    section.open = true;
 
-    const heading = document.createElement("h3");
-    heading.textContent = task.objective;
+    const heading = document.createElement("summary");
+    heading.className = "goal-note-heading";
+    heading.append(createGoalNoteHeadingText(task), createGoalNoteBadges(task, notes));
+
+    const body = document.createElement("div");
+    body.className = "goal-note-group-body";
+
+    const finishedPreview = createGoalNoteFinishedPreview(task);
+    if (finishedPreview) {
+      body.appendChild(finishedPreview);
+    }
 
     const list = document.createElement("ul");
     list.className = "goal-note-items";
@@ -1785,18 +1821,70 @@ function renderGoalNotesModal() {
       list.appendChild(createGoalNoteItem(task, note));
     });
 
-    section.append(heading, list);
+    if (notes.length > 0) {
+      body.appendChild(list);
+    } else {
+      const empty = document.createElement("p");
+      empty.className = "goal-note-empty";
+      empty.textContent = "No notes yet.";
+      body.appendChild(empty);
+    }
+
+    section.append(heading, body);
     elements.goalNotesList.appendChild(section);
   });
 }
 
-function getGoalNoteGroups(rowIndex) {
-  return getSortedTasks()
-    .filter((task) => task.row === rowIndex && task.finishNotes.length > 0)
+function getGoalQuickviewGroups(rowIndex) {
+  return getBoardDisplayTasks(getRows()[rowIndex] || [])
     .map((task) => ({
       task,
-      notes: [...task.finishNotes].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
+      notes: [...(task.finishNotes || [])],
     }));
+}
+
+function createGoalNoteHeadingText(task) {
+  const text = document.createElement("span");
+  text.className = "goal-note-task-title";
+  text.textContent = task.objective;
+  return text;
+}
+
+function createGoalNoteBadges(task, notes) {
+  const badges = document.createElement("span");
+  badges.className = "goal-note-badges";
+
+  if (isTaskFinishedForReport(task)) {
+    badges.appendChild(createGoalNoteBadge("finished", "is-finished"));
+  }
+
+  if (notes.length > 0) {
+    badges.appendChild(createGoalNoteBadge(`${notes.length} note${notes.length === 1 ? "" : "s"}`));
+  }
+
+  if (notes.some((note) => note.flagged)) {
+    badges.appendChild(createGoalNoteBadge("flagged", "is-flagged"));
+  }
+
+  return badges;
+}
+
+function createGoalNoteBadge(label, modifier = "") {
+  const badge = document.createElement("span");
+  badge.className = `goal-note-badge${modifier ? ` ${modifier}` : ""}`;
+  badge.textContent = label;
+  return badge;
+}
+
+function createGoalNoteFinishedPreview(task) {
+  if (!isTaskFinishedForReport(task)) {
+    return null;
+  }
+
+  const preview = document.createElement("p");
+  preview.className = "goal-note-finished-preview";
+  preview.textContent = task.finishedAt ? `Finished ${formatDateTime(task.finishedAt)}` : "Finished";
+  return preview;
 }
 
 function createGoalNoteItem(task, note) {
@@ -2230,6 +2318,14 @@ function createUnfinishedTaskBadge(label, modifier = "") {
 function setUnfinishedTaskGroupsOpen(isOpen) {
   elements.unfinishedTasksList
     .querySelectorAll(".unfinished-activity-group")
+    .forEach((group) => {
+      group.open = isOpen;
+    });
+}
+
+function setGoalNoteGroupsOpen(isOpen) {
+  elements.goalNotesList
+    .querySelectorAll(".goal-note-group")
     .forEach((group) => {
       group.open = isOpen;
     });
@@ -3196,6 +3292,26 @@ function toggleUrgent(taskId) {
   }
   normalizeBoard();
   saveState();
+  render();
+}
+
+function toggleTaskFocus(taskId) {
+  const task = findTask(taskId);
+  if (!task || task.status === "finished") {
+    return;
+  }
+
+  const key = `today:${task.id}`;
+  if (standupHighlightedKeys.has(key)) {
+    removeStandupHighlightKey(key);
+  } else {
+    addStandupHighlightKey(key);
+  }
+
+  if (elements.standupSummaryDialog.open) {
+    syncStandupSummaryHighlightItems();
+  }
+
   render();
 }
 
@@ -5086,6 +5202,7 @@ function formatTimelineDay(entry) {
 function tick() {
   updateDate();
   updateTodayTotals();
+  updateRunningFavicon();
   document.querySelectorAll("[data-elapsed-task-id]").forEach((element) => {
     const task = findTask(element.dataset.elapsedTaskId);
     if (task) {
@@ -5106,6 +5223,32 @@ function tick() {
   if (elements.timeLogDialog.open) {
     renderTimeLogModal();
   }
+}
+
+function updateRunningFavicon() {
+  if (!elements.faviconLink) {
+    return;
+  }
+
+  const hasRunningTask = state.tasks.some(isTaskRunning);
+  if (currentFaviconRunningState === hasRunningTask) {
+    return;
+  }
+
+  currentFaviconRunningState = hasRunningTask;
+  elements.faviconLink.href = hasRunningTask ? createRunningFaviconHref() : DEFAULT_FAVICON_HREF;
+}
+
+function createRunningFaviconHref() {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+      <rect width="64" height="64" rx="14" fill="#dff3df"/>
+      <circle cx="32" cy="32" r="21" fill="#ffffff" stroke="#2f7d32" stroke-width="5"/>
+      <path d="M32 18v15l10 6" fill="none" stroke="#2f7d32" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="32" cy="32" r="3" fill="#1f2528"/>
+    </svg>
+  `;
+  return `data:image/svg+xml,${encodeURIComponent(svg.trim())}`;
 }
 
 function updateTodayTotals() {

@@ -37,13 +37,19 @@ The bucket dropdown is color coded. Drag task boxes within or across activities 
 
 Use **Urgent** on a task box to give it a red border and show a red urgent flag below the activity totals. If an urgent task is running, the task box stays green while the border remains red. Urgent tasks move left within their activity, after any running task.
 
+Use **Focus** on a task box to highlight it in the standup summary's "What I'm doing today" section. The task tile and focus count stay in sync with highlights toggled directly in the standup summary. Use the **summary** pill in the activity totals pane to open the standup summary quickly.
+
 ### Timers And Logs
 
 Click **Start** on a task box to begin timing, or use **Start** when creating a task. Use **Save as Urgent** to create a task already marked urgent. Starting a task moves it to the far left of its current activity without changing the activity priority. Starting another task pauses the current one. Click **Pause** to stop the active timer.
 
+When any task is running, the browser tab favicon turns green so you can spot an active timer from another tab.
+
 Use **Time log** to review, add, edit, delete, or nudge time entries for a task box. Time log entries include their dates. Use the Start and End `-` / `+` controls to move those timestamps by one minute. Use **Notes** to open the notes modal without finishing the task.
 
 Use **Finish** to mark a task complete and open the notes modal. Add, edit, delete, flag, or unflag notes there; finished tasks are marked in report task lines. Press **Finish** again on a completed task to add or manage notes. Completed task boxes move to the end of their activity and are no longer urgent. Use **Flagged Notes** in the activity totals pane to review follow-up notes, jump back to the task notes, or unflag them. Use **Hide Finished** to hide or show finished task boxes.
+
+Use the activity **Quickview** button to preview every task in that activity in the same order as the board, along with any notes and finished-task markers. Tasks in Quickview are collapsible, with **Unfold all** and **Fold all** controls at the top.
 
 ### Reports
 
