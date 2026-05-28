@@ -1,0 +1,3 @@
+- I should be able to set the priority number using a dropdown on the activity instead of updown arrows
+- the default file names should indicate which type of file it is, not just 'standard-enforcer.json'
+- Move the add application pane to the title section, make the 'Standards Enforcer' title smaller and move the settings all the way to the right and instructions to the left (right after title). So it should go left aligned: title, instructions, add application and settings (right aligned).

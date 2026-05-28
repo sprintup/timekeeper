@@ -20,7 +20,7 @@ Each activity shows:
 - Activity name
 - Subtotal time for all task boxes in that activity
 - Notes, rename, and delete controls
-- Priority arrows for moving the activity up or down
+- Priority dropdown for moving the activity to another position
 
 Deleting an activity also deletes the task boxes and time logs inside that activity.
 

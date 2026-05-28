@@ -379,16 +379,6 @@ function handleDocumentClick(event) {
     return;
   }
 
-  if (action === "move-row-up") {
-    moveRowPriority(Number(actionElement.dataset.rowIndex), -1);
-    return;
-  }
-
-  if (action === "move-row-down") {
-    moveRowPriority(Number(actionElement.dataset.rowIndex), 1);
-    return;
-  }
-
   if (action === "delete-row-from-dialog") {
     const rowIndex = Number(elements.rowIndexInput.value);
     if (deleteRowWithPrompt(rowIndex)) {
@@ -549,20 +539,48 @@ function handleDocumentClick(event) {
 }
 
 function handleDocumentChange(event) {
-  if (!event.target.matches(".bucket-select")) {
+  if (event.target.matches(".bucket-select")) {
+    updateTaskBucketFromSelect(event.target);
     return;
   }
 
-  const taskCard = event.target.closest("[data-task-id]");
+  if (event.target.matches(".row-priority-select")) {
+    updateRowPriorityFromSelect(event.target);
+  }
+}
+
+function updateTaskBucketFromSelect(select) {
+  const taskCard = select.closest("[data-task-id]");
   const taskId = taskCard?.dataset.taskId;
   const task = findTask(taskId);
-  if (!task || !BUCKETS.includes(event.target.value)) {
+  if (!task || !BUCKETS.includes(select.value)) {
     return;
   }
 
-  task.bucket = event.target.value;
-  event.target.dataset.bucket = task.bucket;
+  task.bucket = select.value;
+  select.dataset.bucket = task.bucket;
   saveState();
+}
+
+function updateRowPriorityFromSelect(select) {
+  const fromIndex = Number(select.dataset.rowIndex);
+  const toIndex = Number(select.value);
+  if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex) || !state.rows[fromIndex]) {
+    render();
+    return;
+  }
+
+  if (toIndex < 0 || toIndex >= state.rows.length) {
+    select.value = String(fromIndex);
+    return;
+  }
+
+  if (fromIndex === toIndex) {
+    return;
+  }
+
+  moveRow(fromIndex, toIndex);
+  render();
 }
 
 function loadState() {
@@ -1262,7 +1280,12 @@ function render() {
     const label = document.createElement("div");
     label.className = "row-label";
     label.innerHTML = `
-      <span class="row-priority-label">Priority ${rowIndex + 1}</span>
+      <label class="row-priority-field">
+        <span>Priority</span>
+        <select class="row-priority-select" data-row-index="${rowIndex}" aria-label="Set activity priority">
+          ${createRowPriorityOptions(rowIndex, rows.length)}
+        </select>
+      </label>
       <strong></strong>
       <div class="row-subtotal">
         <span>Subtotal</span>
@@ -1281,8 +1304,6 @@ function render() {
         </button>
       </div>
       <div class="row-priority-controls" aria-label="Activity priority controls">
-        <button class="icon-button row-priority-button" data-action="move-row-up" data-row-index="${rowIndex}" aria-label="Increase activity priority" title="Increase priority" type="button"${rowIndex === 0 ? " disabled" : ""}>&uarr;</button>
-        <button class="icon-button row-priority-button" data-action="move-row-down" data-row-index="${rowIndex}" aria-label="Decrease activity priority" title="Decrease priority" type="button"${rowIndex === rows.length - 1 ? " disabled" : ""}>&darr;</button>
         <button class="icon-button row-edit-button" data-action="edit-row" data-row-index="${rowIndex}" type="button">Edit</button>
       </div>
     `;
@@ -1398,6 +1419,12 @@ function getGoalNoteCount(tasks) {
 
 function formatTaskCount(count, statusLabel) {
   return `${count} ${statusLabel} task${count === 1 ? "" : "s"}`;
+}
+
+function createRowPriorityOptions(selectedIndex, rowCount) {
+  return Array.from({ length: rowCount }, (_, index) => (
+    `<option value="${index}"${index === selectedIndex ? " selected" : ""}>Priority ${index + 1}</option>`
+  )).join("");
 }
 
 function createAddTaskFooter(isEmptyBoard = false) {
@@ -2545,20 +2572,6 @@ function getRowFromPoint(x, y) {
   return document.elementsFromPoint(x, y)
     .map((element) => element.closest?.(".task-row"))
     .find(Boolean);
-}
-
-function moveRowPriority(rowIndex, direction) {
-  if (!Number.isInteger(rowIndex) || !Number.isInteger(direction)) {
-    return;
-  }
-
-  const targetIndex = rowIndex + direction;
-  if (targetIndex < 0 || targetIndex >= state.rows.length) {
-    return;
-  }
-
-  moveRow(rowIndex, targetIndex);
-  render();
 }
 
 function moveRow(fromIndex, toIndex) {
