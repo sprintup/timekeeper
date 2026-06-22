@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Timekeeper</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" href="styles.css?v=20260515-task-focus">
+    <link rel="stylesheet" href="styles.css?v=20260622-standup-filter">
   </head>
   <body>
     <div class="app-shell">
@@ -490,6 +490,7 @@
       <div class="modal-body">
         <div class="modal-header">
           <h2>Standup Summary</h2>
+          <button class="button button-secondary standup-highlight-filter-button" id="standupHighlightFilterButton" type="button" aria-pressed="false">Hide unhighlighted</button>
         </div>
         <div class="standup-controls">
           <label class="field standup-date-field">
@@ -499,7 +500,7 @@
           <details class="standup-instructions">
             <summary>Instructions</summary>
             <div class="standup-instructions-content">
-              <p>Set the last standup date to show work logged since that standup. Highlighted items, regardless of color, are items you want to talk about among everything available in the summary. Click bullets in Today to mark yellow focus items, which stay saved across opens and represent work you want to make progress on before the next standup. Notes marked Report in standup appear in Did as purple highlights; removing a purple reported note highlight asks for confirmation and removes Report in standup from that note. Notes flagged for elevation appear in Stuck and are pink the first time they are flagged; changing the pink highlight here does not unflag the note. To unflag a note, use the Flagged Notes pill on the main screen.</p>
+              <p>Set the last standup date to show work logged since that standup. Highlighted items, regardless of color, are items you want to talk about among everything available in the summary. Use Hide unhighlighted to narrow the preview and copied summary to highlighted items only. Click bullets in Today to mark yellow focus items, which stay saved across opens and represent work you want to make progress on before the next standup. Notes marked Report in standup appear in Did as purple highlights; removing a purple reported note highlight asks for confirmation and removes Report in standup from that note. Notes flagged for elevation appear in Stuck and are pink the first time they are flagged; changing the pink highlight here does not unflag the note. To unflag a note, use the Flagged Notes pill on the main screen.</p>
               <dl>
                 <div>
                   <dt>What I did since last standup</dt>
@@ -525,6 +526,6 @@
         </div>
       </div>
     </dialog>
-    <script src="script.js?v=20260506-backup-permission-prompt"></script>
+    <script src="script.js?v=20260622-standup-filter"></script>
   </body>
 </html>

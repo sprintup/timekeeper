@@ -37,7 +37,7 @@ The bucket dropdown is color coded. Drag task boxes within or across activities 
 
 Use **Urgent** on a task box to give it a red border and show a red urgent flag below the activity totals. If an urgent task is running, the task box stays green while the border remains red. Urgent tasks move left within their activity, after any running task.
 
-Use **Focus** on a task box to highlight it in the standup summary's "What I'm doing today" section. The task tile and focus count stay in sync with highlights toggled directly in the standup summary. Use the **summary** pill in the activity totals pane to open the standup summary quickly.
+Use **Focus** on a task box to highlight it in the standup summary's "What I'm doing today" section. The task tile and focus count stay in sync with highlights toggled directly in the standup summary. Use **Hide unhighlighted** in the standup summary to show and copy only highlighted items. Use the **summary** pill in the activity totals pane to open the standup summary quickly.
 
 ### Timers And Logs
 

@@ -1188,6 +1188,17 @@ body.is-board-dragging * {
   min-width: 0;
 }
 
+.standup-highlight-filter-button {
+  flex: 0 0 auto;
+  min-width: 160px;
+}
+
+.standup-highlight-filter-button[aria-pressed="true"] {
+  border-color: #d1b84c;
+  background: var(--yellow);
+  color: #564713;
+}
+
 .standup-instructions {
   min-width: 0;
   border: 1px solid var(--line);

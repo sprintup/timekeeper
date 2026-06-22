@@ -37,6 +37,7 @@ let backupSaveInProgress = false;
 let backupAutoSaveMinutes = DEFAULT_BACKUP_AUTOSAVE_MINUTES;
 let standupLastDate = "";
 let standupHighlightedKeys = new Set();
+let standupHideUnhighlighted = false;
 let currentFaviconRunningState = null;
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -204,6 +205,7 @@ function cacheElements() {
   elements.copyStandupSummaryButton = document.getElementById("copyStandupSummaryButton");
   elements.copyStandupSummaryStatus = document.getElementById("copyStandupSummaryStatus");
   elements.lastStandupDateInput = document.getElementById("lastStandupDateInput");
+  elements.standupHighlightFilterButton = document.getElementById("standupHighlightFilterButton");
 }
 
 function bindEvents() {
@@ -237,6 +239,7 @@ function bindEvents() {
   elements.copyReportButton.addEventListener("click", copyReportFromDialog);
   elements.copyStandupSummaryButton.addEventListener("click", copyStandupSummaryFromDialog);
   elements.lastStandupDateInput?.addEventListener("change", saveLastStandupDateFromInput);
+  elements.standupHighlightFilterButton?.addEventListener("click", toggleStandupHighlightFilter);
   elements.flaggedNotesButton.addEventListener("click", openFlaggedNotesDialog);
   elements.urgentIndicator.addEventListener("click", openUrgentTasksDialog);
   elements.focusIndicator?.addEventListener("click", openFocusTasksDialog);
@@ -3782,6 +3785,7 @@ function resetStateWithPrompt() {
   window.localStorage.removeItem(STANDUP_SETTINGS_KEY);
   standupLastDate = getDefaultLastStandupDate();
   standupHighlightedKeys = new Set();
+  standupHideUnhighlighted = false;
   closeDialog(elements.timeLogDialog);
   closeDialog(elements.logDialog);
   closeDialog(elements.finishNoteDialog);
@@ -3821,6 +3825,7 @@ function openStandupSummaryDialog() {
   }
 
   syncLastStandupDateInput();
+  syncStandupHighlightFilterButton();
   renderStandupSummaryPreview();
   openDialog(elements.standupSummaryDialog);
 }
@@ -3830,6 +3835,7 @@ function loadStandupSettings() {
   if (!stored) {
     standupLastDate = getDefaultLastStandupDate();
     standupHighlightedKeys = new Set();
+    standupHideUnhighlighted = false;
     return;
   }
 
@@ -3841,9 +3847,11 @@ function loadStandupSettings() {
         ? settings.highlightedKeys.filter((key) => typeof key === "string" && key)
         : []
     );
+    standupHideUnhighlighted = settings.hideUnhighlighted === true;
   } catch (error) {
     standupLastDate = getDefaultLastStandupDate();
     standupHighlightedKeys = new Set();
+    standupHideUnhighlighted = false;
   }
 }
 
@@ -3851,7 +3859,24 @@ function saveStandupSettings() {
   window.localStorage.setItem(STANDUP_SETTINGS_KEY, JSON.stringify({
     lastStandupDate: getLastStandupDateValue(),
     highlightedKeys: [...standupHighlightedKeys],
+    hideUnhighlighted: standupHideUnhighlighted,
   }));
+}
+
+function toggleStandupHighlightFilter() {
+  standupHideUnhighlighted = !standupHideUnhighlighted;
+  saveStandupSettings();
+  renderStandupSummaryPreview();
+}
+
+function syncStandupHighlightFilterButton() {
+  const button = elements.standupHighlightFilterButton;
+  if (!button) {
+    return;
+  }
+
+  button.textContent = standupHideUnhighlighted ? "Show all" : "Hide unhighlighted";
+  button.setAttribute("aria-pressed", String(standupHideUnhighlighted));
 }
 
 function syncLastStandupDateInput() {
@@ -3874,25 +3899,38 @@ function saveLastStandupDateFromInput() {
 function renderStandupSummaryPreview() {
   const summary = buildStandupSummary();
   elements.standupSummaryPreview.innerHTML = "";
+  syncStandupHighlightFilterButton();
 
   appendStandupGroupedPreviewSection(
     elements.standupSummaryPreview,
     "What I did since last standup",
-    summary.sinceLastStandupTasks,
+    getStandupVisibleItems(summary.sinceLastStandupTasks, "since"),
     "since"
   );
   appendStandupGroupedPreviewSection(
     elements.standupSummaryPreview,
     "What I'm doing today",
-    summary.todayTasks,
+    getStandupVisibleItems(summary.todayTasks, "today"),
     "today"
   );
   appendStandupGroupedPreviewSection(
     elements.standupSummaryPreview,
     "What I'm stuck on",
-    summary.blockers,
+    getStandupVisibleItems(summary.blockers, "blocker"),
     "blocker"
   );
+}
+
+function getStandupVisibleItems(items, sectionKey) {
+  if (!standupHideUnhighlighted) {
+    return items;
+  }
+
+  return items.filter((item) => standupHighlightedKeys.has(getStandupSummaryItemKey(sectionKey, item)));
+}
+
+function getStandupEmptyText() {
+  return standupHideUnhighlighted ? "None highlighted" : "None";
 }
 
 function appendStandupPreviewSection(parent, title, items, formatter, sectionKey) {
@@ -3903,7 +3941,7 @@ function appendStandupPreviewSection(parent, title, items, formatter, sectionKey
   const list = document.createElement("ul");
   if (items.length === 0) {
     const emptyItem = document.createElement("li");
-    emptyItem.textContent = "None";
+    emptyItem.textContent = getStandupEmptyText();
     list.appendChild(emptyItem);
   } else {
     items.forEach((item) => {
@@ -3923,7 +3961,7 @@ function appendStandupGroupedPreviewSection(parent, title, items, sectionKey) {
   if (items.length === 0) {
     const list = document.createElement("ul");
     const emptyItem = document.createElement("li");
-    emptyItem.textContent = "None";
+    emptyItem.textContent = getStandupEmptyText();
     list.appendChild(emptyItem);
     parent.appendChild(list);
     return;
@@ -4152,7 +4190,7 @@ function toggleStandupSummaryItemHighlight(item) {
     refreshStandupNoteStateViews();
   }
 
-  if (shouldRefreshPreview || reportSyncChanged) {
+  if (standupHideUnhighlighted || shouldRefreshPreview || reportSyncChanged) {
     renderStandupSummaryPreview();
   } else {
     syncStandupSummaryHighlightItems();
@@ -4408,14 +4446,15 @@ function buildStandupSummaryText(summary = buildStandupSummary()) {
 }
 
 function appendStandupSummaryTextSection(lines, title, items, sectionKey) {
+  const visibleItems = getStandupVisibleItems(items, sectionKey);
   lines.push(title);
 
-  if (items.length === 0) {
-    lines.push("- None", "");
+  if (visibleItems.length === 0) {
+    lines.push(`- ${getStandupEmptyText()}`, "");
     return;
   }
 
-  getStandupProjectGroups(items).forEach((group) => {
+  getStandupProjectGroups(visibleItems).forEach((group) => {
     lines.push(group.label);
     getStandupTaskGroups(group.items).forEach((taskGroup) => {
       const summaryItem = taskGroup.summaryItem;
