@@ -388,18 +388,27 @@
         </div>
         <input id="logTaskIdInput" type="hidden">
         <input id="logIdInput" type="hidden">
-        <label class="field">
-          <span>Start time</span>
-          <input id="logStartInput" type="datetime-local">
-        </label>
-        <label class="field">
-          <span>Stop time</span>
-          <input id="logEndInput" type="datetime-local">
-        </label>
-        <label class="field">
-          <span>Amount in minutes</span>
-          <input id="manualMinutesInput" min="0" step="1" type="number">
-        </label>
+        <div class="field">
+          <label for="logStartInput">Start time</label>
+          <div class="clearable-field-control">
+            <input id="logStartInput" type="datetime-local">
+            <button class="button button-small button-secondary field-clear-button" type="button" data-action="clear-log-field" data-field="start" aria-label="Clear start time" title="Clear start time">X</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="logEndInput">Stop time</label>
+          <div class="clearable-field-control">
+            <input id="logEndInput" type="datetime-local">
+            <button class="button button-small button-secondary field-clear-button" type="button" data-action="clear-log-field" data-field="end" aria-label="Clear stop time" title="Clear stop time">X</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="manualMinutesInput">Amount in minutes</label>
+          <div class="clearable-field-control">
+            <input id="manualMinutesInput" min="0" step="1" type="number">
+            <button class="button button-small button-secondary field-clear-button" type="button" data-action="clear-log-field" data-field="minutes" aria-label="Clear amount in minutes" title="Clear amount in minutes">X</button>
+          </div>
+        </div>
         <div class="modal-actions">
           <button class="button button-secondary" type="button" data-action="close-log-dialog">Cancel</button>
           <button class="button button-primary" type="submit">Save</button>

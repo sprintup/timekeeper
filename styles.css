@@ -1265,6 +1265,19 @@ body.is-board-dragging * {
   resize: vertical;
 }
 
+.clearable-field-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-clear-button {
+  min-width: 40px;
+  width: 40px;
+  padding: 0;
+}
+
 .settings-section {
   display: grid;
   gap: 14px;

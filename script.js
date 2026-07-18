@@ -456,6 +456,11 @@ function handleDocumentClick(event) {
     return;
   }
 
+  if (action === "clear-log-field") {
+    clearLogField(actionElement.dataset.field);
+    return;
+  }
+
   if (!taskId) {
     return;
   }
@@ -3147,6 +3152,21 @@ function syncLogFieldsFromMinutes() {
   if (end) {
     setLogStartFromEndAndMinutes(end);
   }
+}
+
+function clearLogField(field) {
+  const logFieldElements = {
+    start: elements.logStartInput,
+    end: elements.logEndInput,
+    minutes: elements.manualMinutesInput,
+  };
+  const input = logFieldElements[field];
+  if (!input) {
+    return;
+  }
+
+  input.value = "";
+  input.focus();
 }
 
 function getLogDialogMinutesValue(log) {
