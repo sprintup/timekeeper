@@ -166,6 +166,7 @@ function cacheElements() {
 
   elements.timeLogDialog = document.getElementById("timeLogDialog");
   elements.timeLogDialogTitle = document.getElementById("timeLogDialogTitle");
+  elements.timeLogTotalElapsed = document.getElementById("timeLogTotalElapsed");
   elements.timeLogList = document.getElementById("timeLogList");
 
   elements.finishNoteDialog = document.getElementById("finishNoteDialog");
@@ -1478,8 +1479,8 @@ function createTaskCard(task) {
   bucket.dataset.bucket = task.bucket;
   objective.textContent = task.objective;
   started.textContent = formatTaskStartedAt(task);
-  elapsed.dataset.elapsedTaskId = task.id;
-  elapsed.textContent = formatDuration(getTaskElapsed(task));
+  elapsed.dataset.elapsedTodayTaskId = task.id;
+  elapsed.textContent = formatDuration(getTaskElapsedToday(task));
   finished.textContent = formatTaskFinishedAt(task);
   toggleButton.textContent = isTaskRunning(task) ? "Pause" : "Start";
   urgentButton.classList.toggle("is-active", task.urgent);
@@ -1532,6 +1533,7 @@ function renderTimeLogModal() {
   }
 
   setTaskModalTitle(elements.timeLogDialogTitle, task);
+  elements.timeLogTotalElapsed.textContent = formatDuration(getTaskElapsed(task));
   elements.timeLogList.innerHTML = "";
 
   if (task.logs.length === 0) {
@@ -3281,14 +3283,19 @@ function buildLogDraft({ existingLog, startValue, endValue, minutes }) {
     };
   }
 
-  if (start) {
+  if (start && existingLog && isLogRunning(existingLog)) {
     return {
       start: start.toISOString(),
       end: null,
-      durationMs: 0,
+      durationMs: existingLog.durationMs || 0,
       manual: false,
       createdAt: existingLog?.createdAt || start.toISOString(),
     };
+  }
+
+  if (start) {
+    window.alert("Enter a stop time or amount of time with the start time.");
+    return null;
   }
 
   if (end) {
@@ -5064,6 +5071,10 @@ function getTaskElapsed(task) {
   return task.logs.reduce((total, log) => total + getLogDuration(log, now), 0);
 }
 
+function getTaskElapsedToday(task, now = new Date()) {
+  return task.logs.reduce((total, log) => total + getLogDurationWithinRange(log, startOfToday(), now), 0);
+}
+
 function getRowElapsed(rowIndex) {
   const now = new Date();
   return state.tasks
@@ -5169,7 +5180,9 @@ function formatReportObjectiveSummary(objective) {
 function getLogDurationWithinRange(log, reportStart, reportEnd) {
   if (log.manual) {
     const createdAt = new Date(log.createdAt || Date.now());
-    return createdAt >= reportStart && createdAt <= reportEnd ? log.durationMs : 0;
+    return Number.isNaN(createdAt.getTime()) || createdAt < reportStart || createdAt > reportEnd
+      ? 0
+      : log.durationMs;
   }
 
   if (!log.start) {
@@ -5177,7 +5190,19 @@ function getLogDurationWithinRange(log, reportStart, reportEnd) {
   }
 
   const logStart = new Date(log.start);
-  const logEnd = log.end ? new Date(log.end) : reportEnd;
+  if (Number.isNaN(logStart.getTime())) {
+    return 0;
+  }
+
+  const storedDurationMs = Number(log.durationMs);
+  const fallbackEnd = Number.isFinite(storedDurationMs) && storedDurationMs > 0
+    ? new Date(logStart.getTime() + storedDurationMs)
+    : reportEnd;
+  const logEnd = log.end ? new Date(log.end) : fallbackEnd;
+  if (Number.isNaN(logEnd.getTime())) {
+    return 0;
+  }
+
   const overlapStart = Math.max(logStart.getTime(), reportStart.getTime());
   const overlapEnd = Math.min(logEnd.getTime(), reportEnd.getTime());
   return Math.max(0, overlapEnd - overlapStart);
@@ -5275,10 +5300,10 @@ function tick() {
   updateDate();
   updateTodayTotals();
   updateRunningFavicon();
-  document.querySelectorAll("[data-elapsed-task-id]").forEach((element) => {
-    const task = findTask(element.dataset.elapsedTaskId);
+  document.querySelectorAll("[data-elapsed-today-task-id]").forEach((element) => {
+    const task = findTask(element.dataset.elapsedTodayTaskId);
     if (task) {
-      element.textContent = formatDuration(getTaskElapsed(task));
+      element.textContent = formatDuration(getTaskElapsedToday(task));
     }
   });
   document.querySelectorAll("[data-row-subtotal-index]").forEach((element) => {

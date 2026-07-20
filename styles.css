@@ -1163,6 +1163,33 @@ body.is-board-dragging * {
   white-space: normal;
 }
 
+.time-log-summary {
+  display: grid;
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.time-log-summary div {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #fbfbf8;
+}
+
+.time-log-summary dt {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.time-log-summary dd {
+  margin: 2px 0 0;
+  color: var(--ink);
+  font-weight: 900;
+  white-space: nowrap;
+}
+
 .modal-header-actions {
   display: flex;
   flex-wrap: wrap;

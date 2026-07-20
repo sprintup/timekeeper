@@ -1,6 +1,5 @@
 - [x] Put clear button on start time stop time and amount in minutes to clear those fields.
-- [ ] I should be able to set the priority number using a dropdown on the activity instead of updown arrows
-- [ ] should be able to hide non-highlighted items in standup
 - [ ] there should be a "Elapsed today" field on the front panel of each task
 - [ ] the tasks should be ordered such that the one with the most recent time log is farthest to the left by default (unless reordered manually and not before focused or urgent tasks)
 - [ ] when you open standup summary, it shouldn't automatically hide highlighted
+- [ ] The items in standup summary should only show time since the the last standup. 
