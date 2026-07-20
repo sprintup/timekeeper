@@ -1457,6 +1457,7 @@ function createTaskCard(task) {
   const dragHandle = fragment.querySelector(".task-drag-handle");
   const bucket = fragment.querySelector(".bucket-select");
   const objective = fragment.querySelector(".task-objective");
+  const recentNote = fragment.querySelector(".task-recent-note");
   const started = fragment.querySelector(".started-time");
   const elapsed = fragment.querySelector(".elapsed-time");
   const finished = fragment.querySelector(".finished-time");
@@ -1478,6 +1479,8 @@ function createTaskCard(task) {
   bucket.value = task.bucket;
   bucket.dataset.bucket = task.bucket;
   objective.textContent = task.objective;
+  objective.title = task.objective;
+  renderTaskRecentNote(recentNote, task);
   started.textContent = formatTaskStartedAt(task);
   elapsed.dataset.elapsedTodayTaskId = task.id;
   elapsed.textContent = formatDuration(getTaskElapsedToday(task));
@@ -1492,6 +1495,35 @@ function createTaskCard(task) {
   renderTaskNotesButton(notesButton, task);
 
   return fragment;
+}
+
+function renderTaskRecentNote(element, task) {
+  const note = getMostRecentTaskNote(task);
+  const text = note?.text || "";
+  element.hidden = !text;
+  element.textContent = text;
+  element.title = text;
+}
+
+function getMostRecentTaskNote(task) {
+  if (!Array.isArray(task.finishNotes) || task.finishNotes.length === 0) {
+    return null;
+  }
+
+  return task.finishNotes.reduce((latest, note) => {
+    if (!latest) {
+      return note;
+    }
+
+    const noteTime = getTimestamp(note.createdAt);
+    const latestTime = getTimestamp(latest.createdAt);
+    return noteTime >= latestTime ? note : latest;
+  }, null);
+}
+
+function getTimestamp(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? Number.NEGATIVE_INFINITY : date.getTime();
 }
 
 function renderTaskNotesButton(button, task) {
