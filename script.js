@@ -4331,6 +4331,7 @@ function isTaskHighlightedInStandup(task) {
 function buildStandupSummary() {
   const rangeStart = getStandupRangeStart();
   const rangeEnd = new Date();
+  const sinceLastStandupTasks = getStandupTasksSince(rangeStart, rangeEnd);
   const unfinishedTasks = getSortedTasks().filter((task) => !isTaskFinishedForReport(task));
   const urgentTasks = unfinishedTasks
     .filter((task) => task.urgent)
@@ -4340,34 +4341,27 @@ function buildStandupSummary() {
     .map(createStandupTaskEntry);
 
   return {
-    sinceLastStandupTasks: getStandupDidEntries(rangeStart, rangeEnd),
+    sinceLastStandupTasks: getStandupDidEntries(rangeStart, rangeEnd, sinceLastStandupTasks),
     todayTasks: [...urgentTasks, ...prioritizedTasks],
-    blockers: getFlaggedNotes().map(({ task, note }) => ({
-      id: `${task.id}:${note.id}`,
-      type: "flagged-note",
-      taskId: task.id,
-      noteId: note.id,
-      activity: getRowName(task.row),
-      objective: task.objective,
-      note: note.text,
-      order: task.order,
-      row: task.row,
-      sortTime: new Date(note.createdAt || task.createdAt || Date.now()).getTime(),
-    })),
+    blockers: getStandupFlaggedNoteEntries(rangeStart, rangeEnd),
   };
 }
 
-function getStandupDidEntries(rangeStart, rangeEnd) {
+function getStandupDidEntries(rangeStart, rangeEnd, taskEntries = getStandupTasksSince(rangeStart, rangeEnd)) {
+  const taskIdsWithTime = new Set(taskEntries.map((entry) => entry.id));
   return [
-    ...getStandupTasksSince(rangeStart, rangeEnd),
-    ...getReportedStandupNotes(),
+    ...taskEntries,
+    ...getReportedStandupNotes(rangeStart, rangeEnd, taskIdsWithTime),
   ].sort((a, b) => a.row - b.row || a.sortTime - b.sortTime || a.order - b.order);
 }
 
-function getReportedStandupNotes() {
+function getReportedStandupNotes(rangeStart, rangeEnd, taskIdsWithTime = new Set()) {
   return getSortedTasks()
     .flatMap((task) => task.finishNotes
-      .filter((note) => note.reported)
+      .filter((note) => note.reported && (
+        taskIdsWithTime.has(task.id)
+        || isStandupDateInRange(note.createdAt || task.createdAt, rangeStart, rangeEnd)
+      ))
       .map((note) => ({
         id: `${task.id}:${note.id}`,
         type: "reported-note",
@@ -4382,11 +4376,37 @@ function getReportedStandupNotes() {
       })));
 }
 
+function getStandupFlaggedNoteEntries(rangeStart, rangeEnd) {
+  return getFlaggedNotes()
+    .filter(({ task, note }) => isStandupDateInRange(note.createdAt || task.createdAt, rangeStart, rangeEnd))
+    .map(({ task, note }) => ({
+      id: `${task.id}:${note.id}`,
+      type: "flagged-note",
+      taskId: task.id,
+      noteId: note.id,
+      activity: getRowName(task.row),
+      objective: task.objective,
+      note: note.text,
+      order: task.order,
+      row: task.row,
+      sortTime: new Date(note.createdAt || task.createdAt || Date.now()).getTime(),
+    }));
+}
+
 function getStandupTasksSince(rangeStart, rangeEnd) {
   return getSortedTasks()
     .map((task) => createStandupRangeTaskEntry(task, rangeStart, rangeEnd))
     .filter((entry) => entry.durationMs > 0)
     .sort((a, b) => a.sortTime - b.sortTime || a.row - b.row || a.order - b.order);
+}
+
+function isStandupDateInRange(value, rangeStart, rangeEnd) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return false;
+  }
+
+  return date >= rangeStart && date < rangeEnd;
 }
 
 function createStandupRangeTaskEntry(task, rangeStart, rangeEnd) {
